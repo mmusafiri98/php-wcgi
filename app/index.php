@@ -3,83 +3,88 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-$model = $_POST['model'] ?? "cosmosrp";
-$userMessage = $_POST['message'] ?? "";
-$jarvisResponse = "";
-$debugInfo = "";
+// Si c'est une requête AJAX
+if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
+    header('Content-Type: application/json');
+    
+    $model = $_POST['model'] ?? "cosmosrp";
+    $userMessage = $_POST['message'] ?? "";
+    $response = ["success" => false, "message" => "", "debug" => ""];
 
-if (!empty($userMessage)) {
+    if (!empty($userMessage)) {
 
-    if ($model === "cosmosrp") {
+        if ($model === "cosmosrp") {
 
-        $api_url = "https://api.pawan.krd/cosmosrp/v1/chat/completions";
-        $payload = [
-            "model" => "cosmosrp",
-            "messages" => [
-                ["role" => "system", "content" => "Tu es JARVIS AI, assistant virtuel professionnel créé par Pepe Musafiri."],
-                ["role" => "user", "content" => $userMessage]
-            ]
-        ];
-
-        $ch = curl_init($api_url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        
-        $res = curl_exec($ch);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            $jarvisResponse = "Erreur CURL : " . $curlError;
-        } else {
-            $data = json_decode($res, true);
-            $jarvisResponse = $data["choices"][0]["message"]["content"] ?? "Erreur : pas de réponse de CosmosRP";
-        }
-
-    } else if ($model === "c4ai") {
-
-        $api_url = "https://api.cohere.com/v2/chat";
-        $payload = [
-            "model" => "c4ai-aya-expanse-32b",
-            "messages" => [
-                [
-                    "role" => "user",
-                    "content" => $userMessage
+            $api_url = "https://api.pawan.krd/cosmosrp/v1/chat/completions";
+            $payload = [
+                "model" => "cosmosrp",
+                "messages" => [
+                    ["role" => "system", "content" => "Tu es JARVIS AI, assistant virtuel professionnel créé par Pepe Musafiri."],
+                    ["role" => "user", "content" => $userMessage]
                 ]
-            ]
-        ];
+            ];
 
-        $ch = curl_init($api_url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json",
-            "Authorization: Bearer Uw540GN865rNyiOs3VMnWhRaYQ97KAfudAHAnXzJ"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            $ch = curl_init($api_url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            
+            $res = curl_exec($ch);
+            $curlError = curl_error($ch);
+            curl_close($ch);
 
-        $res = curl_exec($ch);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            $jarvisResponse = "Erreur CURL : " . $curlError;
-        } else {
-            $data = json_decode($res, true);
-
-            $debugInfo = "<pre style='color:#ff6b6b;font-size:10px;'>" . print_r($data, true) . "</pre>";
-
-            if (isset($data["message"]["content"][0]["text"])) {
-                $jarvisResponse = $data["message"]["content"][0]["text"];
-            } else if (isset($data["error"])) {
-                $jarvisResponse = "Erreur API : " . json_encode($data["error"]);
+            if ($curlError) {
+                $response["message"] = "Erreur CURL : " . $curlError;
             } else {
-                $jarvisResponse = "Structure inconnue : " . json_encode($data);
+                $data = json_decode($res, true);
+                $response["message"] = $data["choices"][0]["message"]["content"] ?? "Erreur : pas de réponse de CosmosRP";
+                $response["success"] = true;
+            }
+
+        } else if ($model === "c4ai") {
+
+            $api_url = "https://api.cohere.com/v2/chat";
+            $payload = [
+                "model" => "c4ai-aya-expanse-32b",
+                "messages" => [
+                    ["role" => "user", "content" => $userMessage]
+                ]
+            ];
+
+            $ch = curl_init($api_url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Content-Type: application/json",
+                "Authorization: Bearer Uw540GN865rNyiOs3VMnWhRaYQ97KAfudAHAnXzJ"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+
+            $res = curl_exec($ch);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlError) {
+                $response["message"] = "Erreur CURL : " . $curlError;
+            } else {
+                $data = json_decode($res, true);
+                $response["debug"] = print_r($data, true);
+
+                if (isset($data["message"]["content"][0]["text"])) {
+                    $response["message"] = $data["message"]["content"][0]["text"];
+                    $response["success"] = true;
+                } else if (isset($data["error"])) {
+                    $response["message"] = "Erreur API : " . json_encode($data["error"]);
+                } else {
+                    $response["message"] = "Structure inconnue : " . json_encode($data);
+                }
             }
         }
     }
+
+    echo json_encode($response);
+    exit;
 }
 ?>
 <!DOCTYPE html>
@@ -117,11 +122,6 @@ body{
 .dots span { animation: blink 1.5s infinite; }
 .dots span:nth-child(2) { animation-delay: 0.3s; }
 .dots span:nth-child(3) { animation-delay: 0.6s; }
-
-#thinking {
-    opacity: 1;
-    transition: opacity 0.8s ease-out;
-}
 
 .app-grid{
     display:grid;
@@ -164,6 +164,8 @@ body{
     border-radius:10px;
     margin:8px 0;
 }
+
+.hidden { display: none; }
 </style>
 </head>
 
@@ -175,36 +177,18 @@ body{
 <h3 style="text-align:center;">JARVIS AI</h3>
 
 <div id="response">
-
-<?php if (!empty($userMessage)): ?>
-
-    <div class="msg-user"><?= htmlspecialchars($userMessage) ?></div>
-
-    <div class="msg-jarvis" id="thinking">
-        JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>
-    </div>
-
-    <div class="msg-jarvis">
-        <span id="typedResponse" class="typing"></span>
-    </div>
-
-    <?= $debugInfo ?>
-
-<?php else: ?>
     <div class="msg-jarvis">Bonjour, je suis JARVIS. Comment puis-je vous aider ?</div>
-<?php endif; ?>
-
 </div>
 
-<form method="POST">
-    <input type="text" name="message" placeholder="Parle à JARVIS..." class="form-control" required>
+<form id="chatForm">
+    <input type="text" id="messageInput" name="message" placeholder="Parle à JARVIS..." class="form-control" required>
 
-    <select name="model" class="form-control mt-2" style="background:#000;color:var(--accent);">
+    <select id="modelSelect" name="model" class="form-control mt-2" style="background:#000;color:var(--accent);">
         <option value="cosmosrp">CosmosRP</option>
         <option value="c4ai">C4AI Aya Expanse 32B</option>
     </select>
 
-    <button class="btn btn-info w-100 mt-3">Envoyer</button>
+    <button type="submit" class="btn btn-info w-100 mt-3">Envoyer</button>
 </form>
 </div>
 
@@ -217,7 +201,7 @@ body{
 <div class="panel right-panel">
     <h4 style="text-align:center;">Système</h4>
     <p>Statut : <b style="color:#8bffcf">En ligne</b></p>
-    <p>Modèle sélectionné : <b><?= htmlspecialchars($model) ?></b></p>
+    <p>Modèle sélectionné : <b id="currentModel">cosmosrp</b></p>
 </div>
 
 </div>
@@ -232,38 +216,102 @@ function speakJarvis(text) {
     }
 }
 
-const fullText = <?= json_encode($jarvisResponse) ?>;
-let index = 0;
-
-function typeWriter() {
-    const typingDiv = document.getElementById("typedResponse");
-    const thinking = document.getElementById("thinking");
-
-    if (!typingDiv) return;
-
-    setTimeout(() => { 
-        thinking.style.opacity = "0"; 
-    }, 1200);
+function typeWriter(text, elementId) {
+    const typingDiv = document.getElementById(elementId);
+    let index = 0;
 
     function type() {
-        if (index < fullText.length) {
-            typingDiv.innerHTML += fullText.charAt(index);
+        if (index < text.length) {
+            typingDiv.innerHTML += text.charAt(index);
             index++;
             setTimeout(type, 20);
         } else {
-            speakJarvis(fullText);
+            typingDiv.classList.remove('typing');
+            speakJarvis(text);
         }
     }
     type();
 }
 
-<?php if (!empty($userMessage)): ?>
-typeWriter();
-<?php endif; ?>
+// Gestion du formulaire
+document.getElementById('chatForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const messageInput = document.getElementById('messageInput');
+    const modelSelect = document.getElementById('modelSelect');
+    const responseDiv = document.getElementById('response');
+    const userMessage = messageInput.value.trim();
+    const selectedModel = modelSelect.value;
+
+    if (!userMessage) return;
+
+    // Afficher le message utilisateur
+    const userMsgDiv = document.createElement('div');
+    userMsgDiv.className = 'msg-user';
+    userMsgDiv.textContent = userMessage;
+    responseDiv.appendChild(userMsgDiv);
+
+    // Afficher "JARVIS réfléchit..."
+    const thinkingDiv = document.createElement('div');
+    thinkingDiv.className = 'msg-jarvis';
+    thinkingDiv.id = 'thinking';
+    thinkingDiv.innerHTML = 'JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+    responseDiv.appendChild(thinkingDiv);
+
+    // Scroll vers le bas
+    responseDiv.scrollTop = responseDiv.scrollHeight;
+
+    // Mettre à jour le modèle affiché
+    document.getElementById('currentModel').textContent = selectedModel;
+
+    // Vider l'input
+    messageInput.value = '';
+
+    try {
+        // Envoyer la requête AJAX
+        const formData = new FormData();
+        formData.append('message', userMessage);
+        formData.append('model', selectedModel);
+        formData.append('ajax', 'true');
+
+        const response = await fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        // Supprimer "JARVIS réfléchit"
+        thinkingDiv.remove();
+
+        // Afficher la réponse de JARVIS avec effet typing
+        const jarvisMsgDiv = document.createElement('div');
+        jarvisMsgDiv.className = 'msg-jarvis';
+        const typingSpan = document.createElement('span');
+        typingSpan.id = 'typedResponse_' + Date.now();
+        typingSpan.className = 'typing';
+        jarvisMsgDiv.appendChild(typingSpan);
+        responseDiv.appendChild(jarvisMsgDiv);
+
+        // Afficher debug si présent
+        if (data.debug) {
+            const debugDiv = document.createElement('pre');
+            debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;';
+            debugDiv.textContent = data.debug;
+            responseDiv.appendChild(debugDiv);
+        }
+
+        // Lancer l'animation typing
+        typeWriter(data.message, typingSpan.id);
+
+        // Scroll vers le bas
+        responseDiv.scrollTop = responseDiv.scrollHeight;
+
+    } catch (error) {
+        thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
+    }
+});
 </script>
 
 </body>
 </html>
-
-
-
