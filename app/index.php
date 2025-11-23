@@ -7,7 +7,7 @@ error_reporting(E_ALL);
 if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     header('Content-Type: application/json');
     
-    $model = $_POST['model'] ?? "cosmosrp";
+    $model = $_POST['model'] ?? "c4ai";
     $userMessage = $_POST['message'] ?? "";
     $response = ["success" => false, "message" => "", "debug" => ""];
 
@@ -184,8 +184,8 @@ body{
     <input type="text" id="messageInput" name="message" placeholder="Parle à JARVIS..." class="form-control" required>
 
     <select id="modelSelect" name="model" class="form-control mt-2" style="background:#000;color:var(--accent);">
-        <option value="cosmosrp">CosmosRP</option>
         <option value="c4ai">C4AI Aya Expanse 32B</option>
+        <option value="cosmosrp">CosmosRP</option>
     </select>
 
     <button type="submit" class="btn btn-info w-100 mt-3">Envoyer</button>
@@ -201,7 +201,7 @@ body{
 <div class="panel right-panel">
     <h4 style="text-align:center;">Système</h4>
     <p>Statut : <b style="color:#8bffcf">En ligne</b></p>
-    <p>Modèle sélectionné : <b id="currentModel">cosmosrp</b></p>
+    <p>Modèle sélectionné : <b id="currentModel">c4ai</b></p>
 </div>
 
 </div>
@@ -210,9 +210,26 @@ body{
 <script src="https://code.responsivevoice.org/responsivevoice.js?key=JvEZWtoL"></script>
 
 <script>
+// Attendre que ResponsiveVoice soit chargé
+let isResponsiveVoiceReady = false;
+
+// Fonction appelée automatiquement quand RV est prêt
+if (typeof responsiveVoice !== 'undefined') {
+    responsiveVoice.OnVoiceReady = function() {
+        isResponsiveVoiceReady = true;
+        console.log("✅ ResponsiveVoice est prêt !");
+    };
+}
+
 function speakJarvis(text) {
-    if (responsiveVoice.voiceSupport()) {
+    // Vérifier si ResponsiveVoice est chargé et prêt
+    if (typeof responsiveVoice !== 'undefined' && isResponsiveVoiceReady) {
         responsiveVoice.speak(text, "French Male");
+    } else if (typeof responsiveVoice !== 'undefined') {
+        // Si pas encore prêt, réessayer après 500ms
+        setTimeout(() => speakJarvis(text), 500);
+    } else {
+        console.warn("⚠️ ResponsiveVoice n'est pas disponible");
     }
 }
 
@@ -227,7 +244,8 @@ function typeWriter(text, elementId) {
             setTimeout(type, 20);
         } else {
             typingDiv.classList.remove('typing');
-            speakJarvis(text);
+            // Attendre un peu avant de parler
+            setTimeout(() => speakJarvis(text), 300);
         }
     }
     type();
@@ -241,7 +259,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     const modelSelect = document.getElementById('modelSelect');
     const responseDiv = document.getElementById('response');
     const userMessage = messageInput.value.trim();
-    const selectedModel = modelSelect.value;
+    const selectedModel = modelSelect.value || 'c4ai'; // Par défaut C4AI
 
     if (!userMessage) return;
 
