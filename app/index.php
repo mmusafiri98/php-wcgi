@@ -206,30 +206,95 @@ body{
 
 </div>
 
-<!-- ResponsiveVoice -->
+<!-- ResponsiveVoice (meilleure qualité vocale) -->
 <script src="https://code.responsivevoice.org/responsivevoice.js?key=JvEZWtoL"></script>
 
 <script>
-// Attendre que ResponsiveVoice soit chargé
-let isResponsiveVoiceReady = false;
+// Variable pour tracker si ResponsiveVoice est prêt
+let voiceReady = false;
 
-// Fonction appelée automatiquement quand RV est prêt
-if (typeof responsiveVoice !== 'undefined') {
-    responsiveVoice.OnVoiceReady = function() {
-        isResponsiveVoiceReady = true;
-        console.log("✅ ResponsiveVoice est prêt !");
-    };
-}
+// Attendre que ResponsiveVoice soit chargé
+window.addEventListener('load', function() {
+    setTimeout(() => {
+        if (typeof responsiveVoice !== 'undefined') {
+            voiceReady = true;
+            console.log("✅ ResponsiveVoice chargé");
+        }
+    }, 1000);
+});
 
 function speakJarvis(text) {
-    // Vérifier si ResponsiveVoice est chargé et prêt
-    if (typeof responsiveVoice !== 'undefined' && isResponsiveVoiceReady) {
-        responsiveVoice.speak(text, "French Male");
-    } else if (typeof responsiveVoice !== 'undefined') {
-        // Si pas encore prêt, réessayer après 500ms
-        setTimeout(() => speakJarvis(text), 500);
+    // OPTION 1: ResponsiveVoice (meilleure qualité)
+    if (typeof responsiveVoice !== 'undefined' && voiceReady) {
+        try {
+            // Liste des voix françaises de meilleure qualité
+            const voiceOptions = [
+                "French Male",
+                "French Female",
+                "Francais France Male",
+                "Francais France Female"
+            ];
+            
+            responsiveVoice.speak(text, voiceOptions[0], {
+                pitch: 1,
+                rate: 0.9,
+                volume: 1,
+                onstart: () => console.log("🔊 JARVIS parle..."),
+                onerror: (e) => {
+                    console.warn("⚠️ Erreur ResponsiveVoice:", e);
+                    fallbackToNativeVoice(text);
+                }
+            });
+            return;
+        } catch (e) {
+            console.warn("⚠️ ResponsiveVoice erreur:", e);
+        }
+    }
+    
+    // OPTION 2: Fallback vers l'API native du navigateur
+    fallbackToNativeVoice(text);
+}
+
+function fallbackToNativeVoice(text) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'fr-FR';
+        utterance.rate = 0.9; // Un peu plus lent pour mieux comprendre
+        utterance.pitch = 1.1; // Légèrement plus aigu
+        utterance.volume = 1.0;
+        
+        // Attendre que les voix soient chargées
+        const setVoice = () => {
+            const voices = window.speechSynthesis.getVoices();
+            
+            // Chercher la meilleure voix française
+            const preferredVoices = [
+                voices.find(v => v.lang === 'fr-FR' && v.name.includes('Thomas')),
+                voices.find(v => v.lang === 'fr-FR' && v.name.includes('Google')),
+                voices.find(v => v.lang === 'fr-FR' && !v.localService),
+                voices.find(v => v.lang.startsWith('fr')),
+                voices.find(v => v.lang === 'fr-FR')
+            ];
+            
+            const bestVoice = preferredVoices.find(v => v);
+            if (bestVoice) {
+                utterance.voice = bestVoice;
+                console.log("🔊 Utilisation de:", bestVoice.name);
+            }
+            
+            window.speechSynthesis.speak(utterance);
+        };
+        
+        // Sur iOS/Safari, les voix se chargent de manière asynchrone
+        if (window.speechSynthesis.getVoices().length === 0) {
+            window.speechSynthesis.onvoiceschanged = setVoice;
+        } else {
+            setVoice();
+        }
     } else {
-        console.warn("⚠️ ResponsiveVoice n'est pas disponible");
+        console.warn("⚠️ Synthèse vocale non supportée");
     }
 }
 
