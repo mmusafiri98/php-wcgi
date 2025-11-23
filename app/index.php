@@ -1,8 +1,15 @@
 <?php
 // index.php - Responsive, AJAX chat, typing effect, TTS
+// Réécriture complète pour corriger : gif non visible sur mobile + éléments manquants
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
+// Local path to uploaded image (provided in the session assets)
+$imageLocalPath = '/mnt/data/773cfaa9-881a-4acb-a0ac-63ff13af967d.png';
+
+// If file exists, use it; otherwise keep null and show placeholder in HTML
+$imageUrl = file_exists($imageLocalPath) ? $imageLocalPath : null;
 
 // --- AJAX handler ---
 if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
@@ -58,7 +65,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 "Content-Type: application/json",
                 // === REPLACE THIS WITH YOUR REAL COHERE KEY ===
-                "Authorization: Bearer Uw540GN865rNyiOs3VMnWhRaYQ97KAfudAHAnXzJ"
+                "Authorization: Bearer YOUR_COHERE_API_KEY"
             ]);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
@@ -124,11 +131,10 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
       -webkit-font-smoothing:antialiased;
     }
 
-    /* Layout */
     .app-container {
-      max-width: 1200px;
-      margin: 18px auto;
-      padding: 12px;
+      max-width: 1400px;
+      margin: 12px auto;
+      padding: 10px;
     }
 
     .card-app {
@@ -136,18 +142,19 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
       border: 1px solid rgba(0,255,255,0.08);
       border-radius: 12px;
       padding: 12px;
-      min-height: 72vh;
+      min-height: 64vh;
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
 
-    /* Chat area */
+    /* Chat area - use viewport units for responsive height */
     #chatWindow {
       background: rgba(0,10,16,0.24);
       padding: 14px;
       border-radius: 10px;
-      height: 56vh;
+      height: calc(60vh - 30px);
+      min-height: 220px;
       overflow-y: auto;
       color: #e8fbff;
     }
@@ -183,13 +190,11 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
       display: inline-block;
     }
 
-    /* thinking dots */
     .dots span { animation: blink 1.5s infinite; display:inline-block; margin-right:2px; }
     .dots span:nth-child(2) { animation-delay: 0.25s; }
     .dots span:nth-child(3) { animation-delay: 0.5s; }
     @keyframes blink { 0%{opacity:.2}50%{opacity:1}100%{opacity:.2} }
 
-    /* Right panel small stats */
     .sys-card {
       background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
       border-radius: 10px;
@@ -197,13 +202,35 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
       color: #dff9ff;
     }
 
-    /* Responsive tweaks */
+    /* Image container adjustments so gif shows on all sizes */
+    .visual-wrap {
+      width: 100%;
+      height: calc(60vh - 40px);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      border-radius: 8px;
+    }
+    .visual-wrap img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain; /* important: ensures image fits on mobile & large screens */
+      display: block;
+      border-radius: 8px;
+    }
+
+    /* Small-screen tweaks */
     @media (max-width: 991.98px) {
-      #chatWindow { height: 50vh; }
+      #chatWindow { height: calc(50vh - 30px); }
+      .visual-wrap { height: 220px; }
+      .card-app { min-height: auto; }
     }
     @media (max-width: 575.98px) {
-      #chatWindow { height: 48vh; }
+      #chatWindow { height: calc(46vh - 20px); }
+      .visual-wrap { height: 180px; }
       .card-app { padding: 8px; }
+      .msg-user, .msg-jarvis { font-size: 0.95rem; }
     }
   </style>
 </head>
@@ -211,7 +238,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
   <div class="container app-container">
     <div class="row g-3">
       <!-- Left: Chat -->
-      <div class="col-12 col-lg-4">
+      <div class="col-12 col-md-5 col-lg-4">
         <div class="card-app h-100">
           <h5 class="text-center">JARVIS AI</h5>
 
@@ -236,10 +263,21 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
       </div>
 
       <!-- Center: Visual / large -->
-      <div class="col-12 col-lg-4">
+      <div class="col-12 col-md-7 col-lg-4">
         <div class="card-app h-100 d-flex flex-column align-items-center justify-content-center">
-          <!-- Use uploaded file path as image source (was provided in session) -->
-          <img src="/mnt/data/773cfaa9-881a-4acb-a0ac-63ff13af967d.png" alt="Jarvis" class="img-fluid" style="max-height:60vh; border-radius:8px; object-fit:cover;">
+          <div class="visual-wrap">
+            <?php if ($imageUrl): ?>
+              <!-- Use server-local path provided earlier -->
+              <img src="<?= htmlspecialchars($imageUrl) ?>" alt="Jarvis visual" id="jarvisVisual">
+            <?php else: ?>
+              <!-- Placeholder SVG when no image -->
+              <svg width="100%" height="100%" viewBox="0 0 600 400" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Jarvis placeholder">
+                <rect width="100%" height="100%" fill="#07101a"/>
+                <text x="50%" y="50%" fill="#0ff" font-family="Orbitron, Arial" font-size="24" text-anchor="middle" dy=".3em">Jarvis visual unavailable</text>
+              </svg>
+            <?php endif; ?>
+          </div>
+
           <p class="mt-3 text-center" style="color:var(--muted); font-size:0.95rem;">JARVIS — assistant virtuel</p>
         </div>
       </div>
@@ -257,6 +295,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
               <li>Utilise le modèle <code>c4ai</code> pour LLM texte.</li>
               <li>Remplace <code>YOUR_COHERE_API_KEY</code> par ta clé Cohere côté serveur.</li>
               <li>Si tu as une page blanche, active les erreurs PHP (déjà actives ici).</li>
+              <li>Sur mobile, l'image est redimensionnée automatiquement (object-fit: contain).</li>
             </ul>
           </div>
         </div>
@@ -267,7 +306,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
   <!-- ResponsiveVoice (TTS) - replace key if you have one -->
   <script src="https://code.responsivevoice.org/responsivevoice.js?key=JvEZWtoL"></script>
 
-  <!-- Bootstrap JS (optional, for dropdowns/tooltips) -->
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
@@ -323,7 +362,6 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     // Try responsiveVoice first
     if (typeof responsiveVoice !== 'undefined') {
       try {
-        // Use a French male voice option (depends on responsiveVoice availability)
         responsiveVoice.speak(text, "French Male", {rate: 0.95, pitch:1, volume:1});
         return;
       } catch (e) {
@@ -338,7 +376,6 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
       u.lang = 'fr-FR';
       u.rate = 0.95;
       u.pitch = 1;
-      // choose a french voice if available
       const voices = window.speechSynthesis.getVoices().filter(v => v.lang && v.lang.startsWith('fr'));
       if (voices.length) u.voice = voices[0];
       window.speechSynthesis.speak(u);
@@ -384,7 +421,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
       if (thinkingEl) thinkingEl.remove();
 
       // show debug if any (server-side)
-      if (json.debug) {
+      if (json.debug && json.debug.length > 5) {
         const dbg = document.createElement('pre');
         dbg.style.cssText = 'color:#ff6b6b;font-size:11px;white-space:pre-wrap;';
         dbg.textContent = json.debug;
@@ -415,6 +452,16 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       document.getElementById('chatForm').dispatchEvent(new Event('submit', {cancelable: true}));
+    }
+  });
+
+  // Ensure image stays visible on orientation change & small screens
+  window.addEventListener('resize', () => {
+    const img = document.getElementById('jarvisVisual');
+    if (img) {
+      // force repaint so object-fit:contain recalculates on some mobile browsers
+      img.style.display = 'none';
+      setTimeout(() => img.style.display = 'block', 50);
     }
   });
   </script>
