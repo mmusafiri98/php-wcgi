@@ -165,7 +165,29 @@ body{
     margin:8px 0;
 }
 
-.hidden { display: none; }
+.center-panel{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    border-radius:14px;
+    overflow:hidden;
+    position: relative;
+}
+
+.center-panel img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
+
+@media(max-width:992px){
+    .center-panel{
+        height: 250px;
+    }
+    .center-panel img{
+        object-fit:contain;
+    }
+}
 </style>
 </head>
 
@@ -192,9 +214,9 @@ body{
 </form>
 </div>
 
-<!-- CENTER -->
+<!-- CENTER (JARVIS GIF) -->
 <div class="panel center-panel">
-    <img id="jarvis-gif" src="jarvis.gif" alt="JARVIS" style="width:100%;height:100%;object-fit:cover;">
+    <img id="jarvis-gif" src="jarvis.gif" alt="JARVIS" loading="lazy">
 </div>
 
 <!-- RIGHT PANEL -->
