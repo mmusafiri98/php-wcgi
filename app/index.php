@@ -1,18 +1,23 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// -------------------------------
+// API HANDLER (AJAX REQUEST)
+// -------------------------------
+if (!empty($_POST["ajax"])) {
 
-$model = $_POST['model'] ?? "cosmosrp";
-$userMessage = $_POST['message'] ?? "";
-$jarvisResponse = "";
-$debugInfo = "";
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
 
-if (!empty($userMessage)) {
+    $model = $_POST["model"];
+    $userMessage = $_POST["message"];
+    $response = "";
 
+    // ------------------------
+    // CALL COSMOSRP
+    // ------------------------
     if ($model === "cosmosrp") {
 
-        $api_url = "https://api.pawan.krd/cosmosrp/v1/chat/completions";
+        $url = "https://api.pawan.krd/cosmosrp/v1/chat/completions";
 
         $payload = [
             "model" => "cosmosrp",
@@ -22,234 +27,196 @@ if (!empty($userMessage)) {
             ]
         ];
 
-        $ch = curl_init($api_url);
+        $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 
-        $res = curl_exec($ch);
-        $curlError = curl_error($ch);
+        $raw = curl_exec($ch);
         curl_close($ch);
 
-        if ($curlError) {
-            $jarvisResponse = "Erreur CURL : " . $curlError;
-        } else {
-            $data = json_decode($res, true);
-            $jarvisResponse = $data["choices"][0]["message"]["content"] ?? "Erreur : pas de réponse de CosmosRP";
-        }
+        $data = json_decode($raw, true);
+        $response = $data["choices"][0]["message"]["content"] ?? "Erreur CosmosRP.";
+    }
 
-    } else if ($model === "c4ai") {
+    // ------------------------
+    // CALL COHERE
+    // ------------------------
+    if ($model === "c4ai") {
 
-        $api_url = "https://api.cohere.com/v2/chat";
+        $url = "https://api.cohere.com/v2/chat";
 
         $payload = [
             "model" => "c4ai-aya-expanse-32b",
             "messages" => [
-                [
-                    "role" => "user",
-                    "content" => $userMessage
-                ]
+                ["role" => "user", "content" => $userMessage]
             ]
         ];
 
-        $ch = curl_init($api_url);
+        $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Content-Type: application/json",
-            "Authorization: Bearer Uw540GN865rNyiOs3VMnWhRaYQ97KAfudAHAnXzJ"
+            "Authorization: Bearer YOUR_API_KEY"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 
-        $res = curl_exec($ch);
-        $curlError = curl_error($ch);
+        $raw = curl_exec($ch);
         curl_close($ch);
 
-        if ($curlError) {
-            $jarvisResponse = "Erreur CURL : " . $curlError;
+        $data = json_decode($raw, true);
+
+        if (isset($data["message"]["content"][0]["text"])) {
+            $response = $data["message"]["content"][0]["text"];
         } else {
-            $data = json_decode($res, true);
-
-            $debugInfo = "<pre style='color:#ff6b6b;font-size:10px;'>" . print_r($data, true) . "</pre>";
-
-            if (isset($data["message"]["content"][0]["text"])) {
-                $jarvisResponse = $data["message"]["content"][0]["text"];
-            } else if (isset($data["error"])) {
-                $jarvisResponse = "Erreur API : " . json_encode($data["error"]);
-            } else {
-                $jarvisResponse = "Structure inconnue : " . json_encode($data);
-            }
+            $response = json_encode($data);
         }
     }
+
+    echo json_encode(["reply" => $response]);
+    exit;
 }
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS AI — Interface</title>
+<title>JARVIS AI</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://code.responsivevoice.org/responsivevoice.js?key=YOUR_RESPONSIVEVOICE_KEY"></script>
 
 <style>
-:root{
-    --accent:#00eaff;
-    --panel-bg:rgba(0,255,255,0.06);
-}
 body{
     background:#020610;
+    color:#00eaff;
     font-family:"Orbitron";
-    color:var(--accent);
 }
-
-/* typing effect */
-.typing {
-    border-right: .12em solid #00eaff;
-    white-space: pre-wrap;
-    overflow: hidden;
-}
-
-/* thinking dots animation */
-@keyframes blink {
-  0% {opacity: 0.2;}
-  50% {opacity: 1;}
-  100% {opacity: 0.2;}
-}
-.dots span {
-  animation: blink 1.5s infinite;
-}
-.dots span:nth-child(2) {
-  animation-delay: 0.3s;
-}
-.dots span:nth-child(3) {
-  animation-delay: 0.6s;
-}
-
-.app-grid{
-    display:grid;
-    grid-template-columns:320px 1fr 320px;
-    gap:20px;
-    padding:20px;
-    min-height:100vh;
-}
-.panel{
-    background:var(--panel-bg);
-    border:1px solid rgba(0,255,255,0.1);
-    border-radius:14px;
-    padding:14px;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-}
-#response{
+#chat{
     height:60vh;
-    overflow:auto;
-    color:#dff9ff;
-    padding:12px;
-    background:rgba(0,10,16,0.25);
-    border-radius:8px;
+    overflow-y:auto;
+    background:rgba(0,255,255,0.04);
+    padding:15px;
+    border-radius:10px;
 }
 .msg-user{
     text-align:right;
-    background:rgba(0,255,255,0.05);
+    background:rgba(0,255,255,0.1);
+    margin:8px;
     padding:10px;
-    border-radius:10px;
-    margin:8px 0;
+    border-radius:8px;
 }
 .msg-jarvis{
     background:rgba(255,255,255,0.05);
+    margin:8px;
     padding:10px;
-    border-radius:10px;
-    margin:8px 0;
+    border-radius:8px;
+}
+/* Typing effect */
+.typing {
+    border-right: 2px solid #00eaff;
+    white-space: pre-wrap;
+}
+/* Thinking animation */
+.dots span {
+    animation: blink 1.5s infinite;
+}
+@keyframes blink {
+    0% { opacity: 0.2; }
+    50% { opacity: 1; }
+    100% { opacity: 0.2; }
 }
 </style>
 </head>
 
-<body>
+<body class="container py-4">
 
-<div class="app-grid">
+<h1 class="text-center">JARVIS AI</h1>
 
-    <!-- LEFT PANEL -->
-    <div class="panel left-panel">
-        <h3 style="text-align:center;">JARVIS AI</h3>
+<div id="chat"></div>
 
-        <div id="response">
-            <?php if (!empty($userMessage)): ?>
-
-                <div class="msg-user"><?= htmlspecialchars($userMessage) ?></div>
-
-                <!-- Thinking Animation -->
-                <div class="msg-jarvis" id="thinking">
-                    JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>
-                </div>
-
-                <!-- Placeholder for typing effect -->
-                <div class="msg-jarvis">
-                    <span id="typedResponse" class="typing"></span>
-                </div>
-
-                <?= $debugInfo ?>
-
-            <?php else: ?>
-                <div class="msg-jarvis">Bonjour, je suis JARVIS. Comment puis-je vous aider ?</div>
-            <?php endif; ?>
-        </div>
-
-        <form method="POST">
-            <input type="text" name="message" placeholder="Parle à JARVIS..." class="form-control" required>
-
-            <select name="model" class="form-control mt-2" style="background:#000;color:var(--accent);">
-                <option value="cosmosrp">CosmosRP</option>
-                <option value="c4ai">C4AI Aya Expanse 32B</option>
-            </select>
-
-            <button class="btn btn-info w-100 mt-3">Envoyer</button>
-        </form>
-    </div>
-
-    <!-- CENTER -->
-    <div class="panel center-panel">
-        <img id="jarvis-gif" src="jarvis.gif" alt="JARVIS" style="width:100%;height:100%;object-fit:cover;">
-    </div>
-
-    <!-- RIGHT PANEL -->
-    <div class="panel right-panel">
-        <h4 style="text-align:center;">Système</h4>
-        <p>Statut : <b style="color:#8bffcf">En ligne</b></p>
-        <p>Modèle sélectionné : <b><?= htmlspecialchars($model) ?></b></p>
-    </div>
-
+<div class="mt-3">
+    <input id="message" type="text" class="form-control" placeholder="Parle à JARVIS...">
+    <select id="model" class="form-control mt-2">
+        <option value="cosmosrp">CosmosRP</option>
+        <option value="c4ai">C4AI Aya Expanse 32B</option>
+    </select>
+    <button onclick="send()" class="btn btn-info w-100 mt-3">Envoyer</button>
 </div>
 
 <script>
-// Typer effect
-const fullText = <?= json_encode($jarvisResponse) ?>;
-let index = 0;
+// ----------------------------
+// SEND MESSAGE (AJAX)
+// ----------------------------
+function send() {
+    const msg = document.getElementById("message").value;
+    const model = document.getElementById("model").value;
 
-function typeWriter() {
-    const typingDiv = document.getElementById("typedResponse");
-    const thinking = document.getElementById("thinking");
+    if (!msg) return;
 
-    if (!typingDiv) return;
+    // Print user message
+    document.getElementById("chat").innerHTML +=
+        `<div class='msg-user'>${msg}</div>`;
 
-    setTimeout(() => { thinking.style.display = "none"; }, 300);
+    // Show thinking animation
+    const thinkId = "think_" + Date.now();
+    document.getElementById("chat").innerHTML += `
+        <div class='msg-jarvis' id="${thinkId}">
+            JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>
+        </div>
+    `;
 
+    // Scroll
+    document.getElementById("chat").scrollTop = 999999;
+
+    // AJAX Request
+    fetch("", {
+        method: "POST",
+        headers: {"Content-Type":"application/x-www-form-urlencoded"},
+        body: new URLSearchParams({
+            ajax: 1,
+            message: msg,
+            model: model
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        const reply = data.reply;
+
+        // Remove thinking
+        document.getElementById(thinkId).remove();
+
+        // Add JARVIS reply with typing effect
+        const id = "reply_" + Date.now();
+        document.getElementById("chat").innerHTML +=
+            `<div class='msg-jarvis'><span id="${id}" class="typing"></span></div>`;
+
+        typeWriter(id, reply);
+
+        // Text-to-speech
+        responsiveVoice.speak(reply, "French Male");
+    });
+
+    document.getElementById("message").value = "";
+}
+
+// ----------------------------
+// TYPING EFFECT
+// ----------------------------
+function typeWriter(id, text) {
+    let i = 0;
     function type() {
-        if (index < fullText.length) {
-            typingDiv.innerHTML += fullText.charAt(index);
-            index++;
+        if (i < text.length) {
+            document.getElementById(id).innerHTML += text.charAt(i);
+            i++;
             setTimeout(type, 20);
         }
     }
     type();
 }
-
-<?php if (!empty($userMessage)): ?>
-typeWriter();
-<?php endif; ?>
 </script>
 
 </body>
