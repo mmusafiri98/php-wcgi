@@ -485,78 +485,126 @@ let messageCount = 0;
 let voiceReady = false;
 
 // =================== INITIALISATION ===================
-window.addEventListener('load', function() {
-    setTimeout(() => {
-        if (typeof responsiveVoice !== 'undefined') {
-            voiceReady = true;
-            document.getElementById('voiceStatus').innerHTML = '🔊 Activée';
-            console.log("✅ ResponsiveVoice chargé");
-        } else {
-            document.getElementById('voiceStatus').innerHTML = '🔇 Native';
-            console.log("⚠️ Utilisation de la voix native");
-        }
-    }, 1500);
-});
+let availableVoices = [];
+let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-// =================== FONCTION SYNTHÈSE VOCALE ===================
-function speakJarvis(text) {
-    // OPTION 1: ResponsiveVoice (meilleure qualité)
-    if (typeof responsiveVoice !== 'undefined' && voiceReady) {
-        try {
-            responsiveVoice.speak(text, "French Male", {
-                pitch: 1,
-                rate: 0.9,
-                volume: 1,
-                onstart: () => console.log("🔊 JARVIS parle..."),
-                onerror: (e) => {
-                    console.warn("⚠️ Erreur ResponsiveVoice:", e);
-                    fallbackToNativeVoice(text);
-                }
-            });
-            return;
-        } catch (e) {
-            console.warn("⚠️ ResponsiveVoice erreur:", e);
-        }
-    }
+// Charger les voix disponibles
+function loadVoices() {
+    availableVoices = window.speechSynthesis.getVoices();
     
-    // OPTION 2: Fallback vers l'API native
-    fallbackToNativeVoice(text);
+    if (availableVoices.length > 0) {
+        const frenchVoices = availableVoices.filter(v => v.lang.startsWith('fr'));
+        console.log("🔊 Voix françaises trouvées:", frenchVoices.length);
+        
+        document.getElementById('voiceStatus').innerHTML = '🔊 Prête';
+        voiceReady = true;
+    }
 }
 
-function fallbackToNativeVoice(text) {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        
+// Sur mobile/Safari, les voix se chargent de manière asynchrone
+if ('speechSynthesis' in window) {
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+    setTimeout(() => {
+        if (!voiceReady) {
+            loadVoices();
+        }
+    }, 1000);
+} else {
+    document.getElementById('voiceStatus').innerHTML = '❌ Non supportée';
+    console.warn("⚠️ Synthèse vocale non supportée");
+}
+
+// =================== FONCTION SYNTHÈSE VOCALE (OPTIMISÉE MOBILE) ===================
+function speakJarvis(text) {
+    if (!('speechSynthesis' in window)) {
+        console.warn("⚠️ Synthèse vocale non disponible");
+        return;
+    }
+
+    // IMPORTANT: Sur mobile, il faut annuler AVANT de parler
+    window.speechSynthesis.cancel();
+    
+    // Court délai pour que l'annulation soit effective (crucial sur mobile)
+    setTimeout(() => {
         const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Configuration optimisée pour mobile ET desktop
         utterance.lang = 'fr-FR';
-        utterance.rate = 0.9;
-        utterance.pitch = 1.1;
+        utterance.rate = isMobile ? 0.95 : 0.9;  // Légèrement plus rapide sur mobile
+        utterance.pitch = 1.0;
         utterance.volume = 1.0;
         
-        const setVoice = () => {
-            const voices = window.speechSynthesis.getVoices();
-            const preferredVoices = [
-                voices.find(v => v.lang === 'fr-FR' && v.name.includes('Thomas')),
-                voices.find(v => v.lang === 'fr-FR' && v.name.includes('Google')),
-                voices.find(v => v.lang === 'fr-FR' && !v.localService),
-                voices.find(v => v.lang.startsWith('fr'))
-            ];
-            
-            const bestVoice = preferredVoices.find(v => v);
-            if (bestVoice) {
-                utterance.voice = bestVoice;
-                console.log("🔊 Voix native:", bestVoice.name);
-            }
-            
-            window.speechSynthesis.speak(utterance);
+        // Sélectionner la meilleure voix française disponible
+        const voices = window.speechSynthesis.getVoices();
+        
+        // Priorités de sélection de voix
+        const voicePriorities = [
+            // Voix premium
+            v => v.lang === 'fr-FR' && v.name.toLowerCase().includes('thomas'),
+            v => v.lang === 'fr-FR' && v.name.toLowerCase().includes('google'),
+            v => v.lang === 'fr-FR' && v.name.toLowerCase().includes('amelie'),
+            // Voix cloud (meilleure qualité)
+            v => v.lang === 'fr-FR' && !v.localService,
+            // N'importe quelle voix française
+            v => v.lang === 'fr-FR',
+            v => v.lang.startsWith('fr-'),
+            v => v.lang.startsWith('fr')
+        ];
+        
+        let selectedVoice = null;
+        for (const priority of voicePriorities) {
+            selectedVoice = voices.find(priority);
+            if (selectedVoice) break;
+        }
+        
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+            console.log("🔊 Utilisation de:", selectedVoice.name);
+        } else {
+            console.log("🔊 Utilisation de la voix par défaut");
+        }
+        
+        // Événements pour debug
+        utterance.onstart = () => {
+            console.log("▶️ JARVIS commence à parler");
         };
         
-        if (window.speechSynthesis.getVoices().length === 0) {
-            window.speechSynthesis.onvoiceschanged = setVoice;
-        } else {
-            setVoice();
+        utterance.onend = () => {
+            console.log("✅ JARVIS a fini de parler");
+        };
+        
+        utterance.onerror = (e) => {
+            console.error("❌ Erreur synthèse vocale:", e.error);
+            // Sur mobile, si erreur "interrupted", on réessaie une fois
+            if (e.error === 'interrupted' || e.error === 'canceled') {
+                console.log("🔄 Tentative de relance...");
+                setTimeout(() => {
+                    window.speechSynthesis.speak(utterance);
+                }, 100);
+            }
+        };
+        
+        // Parler !
+        window.speechSynthesis.speak(utterance);
+        
+        // FIX MOBILE: Sur iOS/Android, parfois la voix s'arrête après 15 secondes
+        // On force la continuation pour les longs textes
+        if (isMobile && text.length > 200) {
+            let spokenLength = 0;
+            const checkInterval = setInterval(() => {
+                if (!window.speechSynthesis.speaking) {
+                    clearInterval(checkInterval);
+                } else {
+                    // Forcer la continuation (bug iOS connu)
+                    window.speechSynthesis.pause();
+                    window.speechSynthesis.resume();
+                }
+            }, 10000); // Toutes les 10 secondes
         }
-    }
+        
+    }, 100); // Délai de 100ms crucial pour mobile
 }
 
 // =================== FONCTION TYPING ANIMATION ===================
