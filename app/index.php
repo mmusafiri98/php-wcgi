@@ -1,7 +1,7 @@
 <?php
 // =====================================================
-// JARVIS AI - VERSIONE DEFINITIVA 2025
-// Voce IMMEDIATA + Typing in tempo reale + Mobile Perfect
+// JARVIS AI – VERSIONE DEFINITIVA 2025
+// Parla parola-per-parola mentre scrive carattere per carattere
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -102,12 +102,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 <style>
-:root {
-    --accent: #00eaff;
-    --bg-dark: #020610;
-    --panel-bg: rgba(0, 255, 255, 0.06);
-    --border-color: rgba(0, 255, 255, 0.15);
-}
+:root{--accent:#00eaff;--bg-dark:#020610;--panel-bg:rgba(0,255,255,0.06);--border-color:rgba(0,255,255,0.15);}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg-dark);color:var(--accent);font-family:"Orbitron",sans-serif;min-height:100vh;overflow-x:hidden;}
 .main-container{max-width:1400px;margin:0 auto;padding:15px;}
@@ -120,34 +115,32 @@ body{background:var(--bg-dark);color:var(--accent);font-family:"Orbitron",sans-s
 #chatWindow::-webkit-scrollbar{width:8px;}
 #chatWindow::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);border-radius:10px;}
 #chatWindow::-webkit-scrollbar-thumb{background:var(--accent);border-radius:10px;}
-.msg-user{background:rgba(0,234,255,0.15);padding:12px 15px;border-radius:15px 15px 5px 15px;margin:10px 0 10px auto;text-align:right;max-width:85%;border:1px solid rgba(0,234,255,0.3);animation:slideInRight 0.3s ease;}
-.msg-jarvis{background:rgba(255,255,255,0.1);padding:12px 15px;border-radius:15px 15px 15px 5px;margin:10px 0 10px 0;max-width:85%;border:1px solid rgba(255,255,255,0.2);animation:slideInLeft 0.3s ease;}
+.msg-user{background:rgba(0,234,255,0.15);padding:12px 15px;border-radius:15px 15px 5px 15px;margin:10px 0 10px auto;text-align:right;max-width:85%;border:1px solid rgba(0,234,255,0.3);animation:slideInRight .3s ease;}
+.msg-jarvis{background:rgba(255,255,255,0.1);padding:12px 15px;border-radius:15px 15px 15px 5px;margin:10px 0 10px 0;max-width:85%;border:1px solid rgba(255,255,255,0.2);animation:slideInLeft .3s ease;}
 @keyframes slideInRight{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 @keyframes slideInLeft{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
-@keyframes blink{0%,100%{opacity:0.3}50%{opacity:1}}
+@keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
 .typing{border-right:3px solid var(--accent);animation:blink 1s infinite;}
 .dots span{animation:blink 1.5s infinite;}
-.dots span:nth-child(2){animation-delay:0.3s;}
-.dots span:nth-child(3){animation-delay:0.6s;}
-.form-control,.form-select{background:rgba(0,0,0,0.6)!important;border:1px solid var(--border-color)!important;color:var(--accent)!important;border-radius:10px!important;padding:12px!important;}
-.form-control:focus,.form-select:focus{box-shadow:0 0 15px rgba(0,234,255,0.5)!important;border-color:var(--accent)!important;}
-.btn-send{background:linear-gradient(135deg,#00eaff,#0088cc);border:none;color:#000;font-weight:700;padding:12px 30px;border-radius:10px;transition:all 0.3s;}
-.btn-send:hover{transform:translateY(-2px);box-shadow:0 5px 20px rgba(0,234,255,0.6);}
-.btn-mic{background:linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));border:1px solid rgba(0,234,255,0.12);color:var(--accent);padding:10px 12px;border-radius:10px;transition:all 0.15s;}
-.btn-mic.recording{box-shadow:0 6px 18px rgba(255,50,50,0.3);border-color:rgba(255,80,80,0.9);color:#ff8b8b;}
-.status-item{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(0,234,255,0.1);}
+.dots span:nth-child(2){animation-delay:.3s;}
+.dots span:nth-child(3){animation-delay:.6s;}
+.form-control,.form-select{background:rgba(0,0,0,.6)!important;border:1px solid var(--border-color)!important;color:var(--accent)!important;border-radius:10px!important;padding:12px!important;}
+.form-control:focus,.form-select:focus{box-shadow:0 0 15px rgba(0,234,255,.5)!important;border-color:var(--accent)!important;}
+.btn-send{background:linear-gradient(135deg,#00eaff,#0088cc);border:none;color:#000;font-weight:700;padding:12px 30px;border-radius:10px;transition:all .3s;}
+.btn-send:hover{transform:translateY(-2px);box-shadow:0 5px 20px rgba(0,234,255,.6);}
+.btn-mic{background:linear-gradient(135deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(0,234,255,.12);color:var(--accent);padding:10px 12px;border-radius:10px;transition:all .15s;}
+.btn-mic.recording{box-shadow:0 6px 18px rgba(255,50,50,.3);border-color:rgba(255,80,80,.9);color:#ff8b8b;}
+.status-item{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(0,234,255,.1);}
 .status-item:last-child{border-bottom:none;}
 .status-value{color:#8bffcf;font-weight:700;}
-@media (min-width:768px){.jarvis-visual{height:400px;}#chatWindow{height:500px;}}
-@media (min-width:992px){.jarvis-visual{height:500px;}}
-@media (max-width:576px){.jarvis-visual{height:250px;}#chatWindow{height:350px;}}
+@media(min-width:768px){.jarvis-visual{height:400px;}#chatWindow{height:500px;}}
+@media(min-width:992px){.jarvis-visual{height:500px;}}
+@media(max-width:576px){.jarvis-visual{height:250px;}#chatWindow{height:350px;}}
 </style>
 </head>
 <body>
 <div class="main-container">
-    <div class="jarvis-visual">
-        <img src="jarvis.gif" alt="JARVIS" loading="eager">
-    </div>
+    <div class="jarvis-visual"><img src="jarvis.gif" alt="JARVIS" loading="eager"></div>
     <div class="row g-3">
         <div class="col-12 col-lg-8">
             <div class="panel">
@@ -214,10 +207,10 @@ function unlockAudioContext() {
     }
     audioUnlocked = true;
 }
-document.body.addEventListener('touchstart', unlockAudioContext, { once: true });
-document.body.addEventListener('click', unlockAudioContext, { once: true });
+document.body.addEventListener('touchstart', unlockAudioContext, {once:true});
+document.body.addEventListener('click', unlockAudioContext, {once:true});
 
-// =================== INIZIALIZZAZIONE VOCE ===================
+// =================== INIZIALIZZAZIONE RESPONSIVEVOICE ===================
 window.addEventListener('load', () => {
     const checkRV = setInterval(() => {
         if (typeof responsiveVoice !== 'undefined') {
@@ -232,20 +225,33 @@ window.addEventListener('load', () => {
     setTimeout(() => { if (!voiceReady) document.getElementById('voiceStatus').innerHTML = 'Native'; }, 6000);
 });
 
-// =================== FUNZIONI VOCE ===================
+// =================== FUNZIONI DI SINTESI VOCALE ===================
 function speakJarvisTextImmediate(text, opts = {}) {
     if (!text.trim()) return;
     if (!audioUnlocked) unlockAudioContext();
 
+    // Prefer ResponsiveVoice (più fluido)
     if (typeof responsiveVoice !== 'undefined' && voiceReady) {
-        if (opts.interrupt) responsiveVoice.cancel();
-        responsiveVoice.speak(text, "French Female", {rate: 0.95, pitch: 1, volume: 1});
+        try {
+            if (opts.interrupt) responsiveVoice.cancel();
+            responsiveVoice.speak(text, "French Female", {
+                rate: 1.05,
+                pitch: 1,
+                volume: 1,
+                onstart: () => document.getElementById('voiceStatus').innerHTML = 'Parle...',
+                onend:   () => document.getElementById('voiceStatus').innerHTML = 'Prête'
+            });
+        } catch(e) {}
         return;
     }
+
+    // Fallback Web Speech API
     if ('speechSynthesis' in window) {
         speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'fr-FR'; u.rate = 0.95; u.pitch = 1;
+        u.lang = 'fr-FR';
+        u.rate = 1.1;
+        u.pitch = 1;
         const voices = speechSynthesis.getVoices();
         const fr = voices.find(v => v.lang.startsWith('fr'));
         if (fr) u.voice = fr;
@@ -255,44 +261,54 @@ function speakJarvisTextImmediate(text, opts = {}) {
 function speakJarvis(text) { speakJarvisTextImmediate(text); }
 function testVoice() { speakJarvis("Test vocal réussi, Maître."); }
 
-// =================== TYPEWRITER + VOCE IN TEMPO REALE (VERSIONE PERFETTA) ===================
+// =================== TYPEWRITER + VOCE IN TEMPO REALE (PAROLA PER PAROLA) ===================
 function typeWriterWithVoice(text, element) {
     if (!text) return;
     element.textContent = '';
     element.classList.add('typing');
-    let index = 0;
-    let buffer = '';
 
-    const speakNow = (chunk) => {
-        if (chunk.trim().length > 3) {
-            speakJarvisTextImmediate(chunk.trim(), {interrupt: true});
+    let index = 0;
+    let currentWord = '';
+    let lastSpokenWord = '';
+
+    const speakWord = (word) => {
+        const trimmed = word.trim();
+        if (trimmed && trimmed !== lastSpokenWord && trimmed.length > 1) {
+            const toSpeak = trimmed.replace(/[.,;:!?]$/, '') + ' ';
+            speakJarvisTextImmediate(toSpeak, {interrupt: false});
+            lastSpokenWord = trimmed;
         }
     };
 
-    function type() {
+    const type = () => {
         if (index < text.length) {
             const ch = text[index];
             element.textContent += ch;
-            buffer += ch;
             index++;
 
+            // Rileva fine parola (spazio o punteggiatura)
+            if (/[ \n.,;:!?]/g.test(ch)) {
+                speakWord(currentWord);
+                currentWord = '';
+            } else {
+                currentWord += ch;
+            }
+
+            // Scroll automatico
             const chat = document.getElementById('chatWindow');
             chat.scrollTop = chat.scrollHeight;
 
-            if (buffer.length >= 30 || /[.!?;:…]/.test(ch)) {
-                speakNow(buffer);
-                buffer = '';
-            }
-            setTimeout(type, 16);
+            setTimeout(type, 16);   // ~60 cps → naturale
         } else {
-            if (buffer.trim()) speakNow(buffer.trim());
+            // Ultima parola
+            speakWord(currentWord);
             element.classList.remove('typing');
         }
-    }
+    };
     type();
 }
 
-// =================== SPEECH TO TEXT ===================
+// =================== SPEECH-TO-TEXT ===================
 let recognition = null;
 let recognizing = false;
 const micBtn = document.getElementById('micBtn');
@@ -368,7 +384,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         formData.append('message', userMessage);
         formData.append('model', selectedModel);
 
-        const res = await fetch('', { method: 'POST', body: formData });
+        const res = await fetch('', {method: 'POST', body: formData});
         const data = await res.json();
 
         thinking.remove();
@@ -391,7 +407,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     }
 });
 
-console.log('JARVIS AI 2025 chargé – Voix instantanée activée !');
+console.log('JARVIS AI 2025 chargé – Parle pendant qu’il écrit !');
 </script>
 </body>
 </html>
