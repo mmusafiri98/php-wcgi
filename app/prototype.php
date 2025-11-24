@@ -317,6 +317,24 @@ body {
     transform: translateY(0);
 }
 
+/* =================== MICROPHONE BUTTON =================== */
+.btn-mic {
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid rgba(0,234,255,0.12);
+    color: var(--accent);
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+
+.btn-mic.recording {
+    box-shadow: 0 6px 18px rgba(255, 50, 50, 0.18);
+    transform: translateY(-2px);
+    border-color: rgba(255,80,80,0.9);
+    color: #ff8b8b;
+}
+
 /* =================== STATUS PANEL =================== */
 .status-item {
     display: flex;
@@ -418,14 +436,22 @@ body {
                         >
                     </div>
 
-                    <div class="row g-2">
+                    <div class="row g-2 align-items-center">
                         <div class="col-12 col-sm-7">
                             <select id="modelSelect" class="form-select">
                                 <option value="c4ai">🤖 C4AI Aya Expanse 32B</option>
                                 <option value="cosmosrp">🌌 CosmosRP</option>
                             </select>
                         </div>
-                        <div class="col-12 col-sm-5">
+
+                        <div class="col-6 col-sm-3 d-flex">
+                            <!-- Microphone button for Speech-to-Text (STT) -->
+                            <button type="button" id="micBtn" class="btn btn-mic w-100" title="Avvia/ferma microfono">
+                                🎤 Avvia
+                            </button>
+                        </div>
+
+                        <div class="col-6 col-sm-2">
                             <button type="submit" id="sendBtn" class="btn btn-send w-100">
                                 ▶ Envoyer
                             </button>
@@ -476,7 +502,7 @@ body {
                     • Support mobile & desktop<br>
                     <br>
                     <span id="mobileVoiceNote" style="display: none; color: #ffaa00;">
-                        📱 <strong>Sur mobile:</strong> Cliquez sur "Tester la voix" ou envoyez un message pour activer le son.
+                        📱 <strong>Sur mobile:</strong> Cliquez sur "Tester la voix" ou invia un message per attivare il suono.
                     </span>
                 </div>
             </div>
@@ -495,6 +521,24 @@ let messageCount = 0;
 let voiceReady = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+// Fix per mobile: variabile per sbloccare la voce (evita errori se usata prima)
+let voiceUnlocked = false;
+function unlockVoice() {
+    // semplice flag per evitare errori di chiamata su device mobile
+    voiceUnlocked = true;
+    // alcuni device richiedono un'interazione fisica per sbloccare audio
+    try {
+        if ('speechSynthesis' in window) {
+            // play a silent utterance to unlock in some browsers
+            const u = new SpeechSynthesisUtterance('');
+            u.volume = 0;
+            window.speechSynthesis.speak(u);
+        }
+    } catch (e) {
+        // silent
+    }
+}
+
 // =================== INITIALISATION RESPONSIVEVOICE ===================
 window.addEventListener('load', function() {
     // Attendre que ResponsiveVoice soit chargé
@@ -505,8 +549,8 @@ window.addEventListener('load', function() {
             // Callback quand les voix sont prêtes
             responsiveVoice.OnVoiceReady = function() {
                 voiceReady = true;
-                const voices = responsiveVoice.getVoices();
-                const frenchVoices = voices.filter(v => v.name.includes('French'));
+                const voices = responsiveVoice.getVoices ? responsiveVoice.getVoices() : [];
+                const frenchVoices = voices.filter ? voices.filter(v => v.name && v.name.includes('French')) : [];
                 
                 console.log("✅ ResponsiveVoice prêt");
                 console.log("🔊 Voix françaises:", frenchVoices.length);
@@ -519,7 +563,7 @@ window.addEventListener('load', function() {
             };
             
             // Forcer l'initialisation
-            responsiveVoice.init();
+            try { responsiveVoice.init(); } catch (e) { /* ignore */ }
         }
     }, 100);
     
@@ -533,203 +577,249 @@ window.addEventListener('load', function() {
 });
 
 // =================== FONCTION SYNTHÈSE VOCALE RESPONSIVEVOICE ===================
-function speakJarvis(text) {
-    // OPTION 1: ResponsiveVoice (Priorité)
+function speakJarvisTextImmediate(textChunk, opts = {}) {
+    // speak a small chunk immediately (used during typing)
+    // opts: {interrupt: true/false}
     if (typeof responsiveVoice !== 'undefined' && voiceReady) {
         try {
-            // Annuler toute parole en cours
-            responsiveVoice.cancel();
-            
-            // Liste des meilleures voix françaises disponibles
-            const voiceOptions = [
-                "French Male",           // Voix masculine française
-                "French Female",         // Voix féminine française
-                "French Canadian Male",  // Alternative
-                "French Canadian Female" // Alternative
-            ];
-            
-            // Paramètres optimisés
-            const parameters = {
-                pitch: 1,           // Ton normal
-                rate: 0.95,         // Vitesse (0.95 = légèrement plus lent pour clarté)
-                volume: 1,          // Volume maximum
-                onstart: function() {
-                    console.log("🔊 ResponsiveVoice: JARVIS parle");
-                    document.getElementById('voiceStatus').innerHTML = '🔊 En cours...';
-                },
-                onend: function() {
-                    console.log("✅ ResponsiveVoice: Terminé");
-                    document.getElementById('voiceStatus').innerHTML = '🔊 Prête (ResponsiveVoice)';
-                },
-                onerror: function(error) {
-                    console.error("❌ ResponsiveVoice erreur:", error);
-                    document.getElementById('voiceStatus').innerHTML = '⚠️ Erreur';
-                    // Fallback vers l'API native
-                    fallbackToNativeVoice(text);
-                }
-            };
-            
-            // Parler avec ResponsiveVoice
-            responsiveVoice.speak(text, voiceOptions[0], parameters);
+            if (opts.interrupt) responsiveVoice.cancel();
+            responsiveVoice.speak(textChunk, "French Female", {
+                rate: 0.95,
+                pitch: 1,
+                volume: 1,
+                onstart: function() { document.getElementById('voiceStatus').innerHTML = '🔊 En cours...'; },
+                onend: function() { document.getElementById('voiceStatus').innerHTML = '🔊 Prête (ResponsiveVoice)'; },
+                onerror: function() { document.getElementById('voiceStatus').innerHTML = '⚠️ Erreur'; }
+            });
             return;
-            
-        } catch (error) {
-            console.warn("⚠️ ResponsiveVoice exception:", error);
+        } catch (e) {
+            console.warn('ResponsiveVoice speak error', e);
         }
     }
-    
-    // OPTION 2: Fallback vers l'API native du navigateur
-    console.log("🔄 Utilisation de l'API native (fallback)");
-    fallbackToNativeVoice(text);
-}
-
-// =================== FALLBACK API NATIVE ===================
-function fallbackToNativeVoice(text) {
-    if (!('speechSynthesis' in window)) {
-        console.warn("⚠️ Synthèse vocale non disponible");
-        return;
-    }
-
-    window.speechSynthesis.cancel();
-    
-    setTimeout(() => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'fr-FR';
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-        
+    // fallback native
+    try {
+        if (!('speechSynthesis' in window)) return;
+        const u = new SpeechSynthesisUtterance(textChunk);
+        u.lang = 'fr-FR';
+        u.rate = 0.95;
+        u.pitch = 1.0;
         const voices = window.speechSynthesis.getVoices();
-        const frenchVoice = voices.find(v => 
-            v.lang === 'fr-FR' || v.lang.startsWith('fr')
-        );
-        
-        if (frenchVoice) {
-            utterance.voice = frenchVoice;
-            console.log("🔊 Voix native:", frenchVoice.name);
-        }
-        
-        utterance.onstart = () => {
-            document.getElementById('voiceStatus').innerHTML = '🔊 En cours (native)...';
-        };
-        
-        utterance.onend = () => {
-            document.getElementById('voiceStatus').innerHTML = '🔊 Native (fallback)';
-        };
-        
-        window.speechSynthesis.speak(utterance);
-    }, 100);
-}
-
-// =================== FONCTION TEST VOCAL ===================
-function testVoice() {
-    // Sur mobile, cette interaction déverrouille la voix
-    if (isMobile && !voiceUnlocked) {
-        unlockVoice();
-        setTimeout(() => {
-            speakJarvis("Bonjour, je suis JARVIS. La synthèse vocale fonctionne correctement.");
-        }, 200);
-    } else {
-        speakJarvis("Bonjour, je suis JARVIS. La synthèse vocale fonctionne correctement.");
+        const french = voices.find(v => v.lang && v.lang.startsWith && v.lang.startsWith('fr'));
+        if (french) u.voice = french;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+    } catch (err) {
+        console.warn('native speak error', err);
     }
 }
 
-// =================== FONCTION TYPING ANIMATION ===================
-function typeWriter(text, element) {
+function speakJarvis(text) {
+    // full speech after generation (kept for compatibility)
+    if (typeof responsiveVoice !== 'undefined' && voiceReady) {
+        try { responsiveVoice.cancel(); } catch(e){}
+        try {
+            responsiveVoice.speak(text, "French Female", {rate:0.95, pitch:1, volume:1});
+            return;
+        } catch(e) { console.warn(e); }
+    }
+    if ('speechSynthesis' in window) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'fr-FR'; u.rate = 0.95; u.pitch = 1;
+        const voices = window.speechSynthesis.getVoices();
+        const french = voices.find(v => v.lang && v.lang.startsWith && v.lang.startsWith('fr'));
+        if (french) u.voice = french;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+    }
+}
+
+// =================== FONCTION TYPING ANIMATION + VOICE EN TEMPS RÉEL ===================
+// This implementation types the text char-by-char AND speaks small chunks in real-time
+function typeWriterWithVoice(text, element, options = {}) {
+    const charsPerChunk = options.charsPerChunk || 40; // speak every N chars or on punctuation
+    const speakOnPunctuation = options.speakOnPunctuation !== undefined ? options.speakOnPunctuation : true;
     let index = 0;
+    let buffer = '';
     element.classList.add('typing');
+
+    function shouldSpeakNow(ch) {
+        if (speakOnPunctuation && /[\.\!\?\,;:
+]/.test(ch)) return true;
+        if (buffer.length >= charsPerChunk) return true;
+        return false;
+    }
 
     function type() {
         if (index < text.length) {
-            element.textContent += text.charAt(index);
+            const ch = text.charAt(index);
+            element.textContent += ch;
+            buffer += ch;
             index++;
             element.parentElement.parentElement.scrollTop = element.parentElement.parentElement.scrollHeight;
-            setTimeout(type, 20);
+
+            if (shouldSpeakNow(ch)) {
+                const chunk = buffer.trim();
+                if (chunk.length > 0) {
+                    // speak the chunk immediately, interrupt previous small chunk to keep sync
+                    speakJarvisTextImmediate(chunk, {interrupt: true});
+                }
+                buffer = '';
+            }
+
+            setTimeout(type, 18); // typing speed
         } else {
+            // speak remaining buffer if any, but don't interrupt long full speech
+            if (buffer.trim().length > 0) {
+                speakJarvisTextImmediate(buffer.trim(), {interrupt: false});
+            }
             element.classList.remove('typing');
-            setTimeout(() => speakJarvis(text), 300);
+            // After finished typing, also trigger full speak (optional) after short delay
+            setTimeout(() => speakJarvis(text), 600);
         }
     }
     type();
 }
 
+// =================== SPEECH-TO-TEXT (STT) - WEB SPEECH API ===================
+let recognition = null;
+let recognizing = false;
+const micBtn = document.getElementById('micBtn');
+const msgInput = document.getElementById('messageInput');
+
+function initSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if (!SpeechRecognition) {
+        if (micBtn) { micBtn.disabled = true; micBtn.title = 'Reconnaissance vocale non supportée'; }
+        console.warn('SpeechRecognition non supporté par ce navigateur.');
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'fr-FR';
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    recognition.onstart = function() {
+        recognizing = true;
+        if (micBtn) { micBtn.classList.add('recording'); micBtn.textContent = '⏺️ Enregistrement...'; }
+        document.getElementById('voiceStatus').textContent = '🎙️ Écoute...';
+    };
+
+    recognition.onerror = function(event) {
+        console.error('SpeechRecognition error', event);
+        recognizing = false;
+        if (micBtn) { micBtn.classList.remove('recording'); micBtn.textContent = '🎤 Avvia'; }
+        document.getElementById('voiceStatus').textContent = '⚠️ Erreur STT';
+    };
+
+    recognition.onend = function() {
+        recognizing = false;
+        if (micBtn) { micBtn.classList.remove('recording'); micBtn.textContent = '🎤 Avvia'; }
+        document.getElementById('voiceStatus').textContent = voiceReady ? '🔊 Prête (ResponsiveVoice)' : '🔊 Native (fallback)';
+    };
+
+    let finalTranscript = '';
+    recognition.onresult = function(event) {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const res = event.results[i];
+            if (res.isFinal) {
+                finalTranscript += res[0].transcript + ' ';
+            } else {
+                interimTranscript += res[0].transcript;
+            }
+        }
+        msgInput.value = (finalTranscript + interimTranscript).trim();
+    };
+}
+
+if (micBtn) {
+    initSpeechRecognition();
+    micBtn.addEventListener('click', () => {
+        if (isMobile && !voiceUnlocked) unlockVoice();
+        if (!recognition) return;
+        if (recognizing) {
+            recognition.stop();
+            recognizing = false;
+            micBtn.classList.remove('recording');
+            micBtn.textContent = '🎤 Avvia';
+        } else {
+            try {
+                recognition.start();
+            } catch (e) {
+                console.warn('recognition.start() exception', e);
+            }
+        }
+    });
+}
+
 // =================== GESTION DU FORMULAIRE ===================
-document.getElementById('chatForm').addEventListener('submit', async (e) => {
+const chatForm = document.getElementById('chatForm');
+const sendBtn = document.getElementById('sendBtn');
+const modelSelect = document.getElementById('modelSelect');
+const chatWindow = document.getElementById('chatWindow');
+
+chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // DÉVERROUILLAGE VOCAL sur mobile au premier clic
     if (isMobile && !voiceUnlocked) {
         unlockVoice();
     }
 
-    const messageInput = document.getElementById('messageInput');
-    const modelSelect = document.getElementById('modelSelect');
-    const sendBtn = document.getElementById('sendBtn');
-    const chatWindow = document.getElementById('chatWindow');
-    
-    const userMessage = messageInput.value.trim();
+    const userMessage = msgInput.value.trim();
     const selectedModel = modelSelect.value;
 
     if (!userMessage) return;
 
-    // Désactiver le bouton pendant l'envoi
     sendBtn.disabled = true;
     sendBtn.textContent = '⏳ Envoi...';
 
-    // Incrémenter le compteur
     messageCount++;
     document.getElementById('msgCount').textContent = messageCount;
 
-    // Afficher le message utilisateur
     const userMsgDiv = document.createElement('div');
     userMsgDiv.className = 'msg-user';
     userMsgDiv.textContent = userMessage;
     chatWindow.appendChild(userMsgDiv);
 
-    // Afficher "JARVIS réfléchit..."
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'msg-jarvis';
     thinkingDiv.innerHTML = '🤔 JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
     chatWindow.appendChild(thinkingDiv);
 
-    // Scroll
     chatWindow.scrollTop = chatWindow.scrollHeight;
 
-    // Mettre à jour le modèle affiché
-    const modelNames = {
-        'c4ai': 'C4AI Aya Expanse 32B',
-        'cosmosrp': 'CosmosRP'
-    };
+    const modelNames = { 'c4ai': 'C4AI Aya Expanse 32B', 'cosmosrp': 'CosmosRP' };
     document.getElementById('currentModel').textContent = modelNames[selectedModel];
 
-    // Vider l'input
-    messageInput.value = '';
+    // keep a local copy before clearing input
+    const pendingMessage = msgInput.value;
+    msgInput.value = '';
 
     try {
-        // Envoyer la requête AJAX
         const formData = new FormData();
-        formData.append('message', userMessage);
+        formData.append('message', pendingMessage);
         formData.append('model', selectedModel);
         formData.append('ajax', 'true');
 
-        const response = await fetch(window.location.href, {
+        const response = await fetch('<?php echo $_SERVER['PHP_SELF']; ?>', {
             method: 'POST',
-            body: formData
+            body: formData,
+            credentials: 'same-origin'
         });
 
+        if (!response.ok) throw new Error('HTTP error ' + response.status);
         const data = await response.json();
 
-        // Supprimer "JARVIS réfléchit"
         thinkingDiv.remove();
 
-        // Afficher la réponse avec effet typing
         const jarvisMsgDiv = document.createElement('div');
         jarvisMsgDiv.className = 'msg-jarvis';
         const typingSpan = document.createElement('span');
         jarvisMsgDiv.appendChild(typingSpan);
         chatWindow.appendChild(jarvisMsgDiv);
 
-        // Debug si présent (masqué par défaut)
         if (data.debug && !data.success) {
             const debugDiv = document.createElement('details');
             debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;margin-top:10px;';
@@ -737,27 +827,26 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
             chatWindow.appendChild(debugDiv);
         }
 
-        // Animation typing
-        typeWriter(data.message, typingSpan);
+        // Use the enhanced typewriter with live voice
+        typeWriterWithVoice(data.message, typingSpan, {charsPerChunk: 45, speakOnPunctuation: true});
 
-        // Scroll final
         chatWindow.scrollTop = chatWindow.scrollHeight;
 
     } catch (error) {
         thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
         console.error('Erreur:', error);
     } finally {
-        // Réactiver le bouton
         sendBtn.disabled = false;
         sendBtn.textContent = '▶ Envoyer';
-        messageInput.focus();
+        msgInput.focus();
     }
 });
 
 // =================== FOCUS AUTOMATIQUE ===================
-document.getElementById('messageInput').focus();
+try { document.getElementById('messageInput').focus(); } catch (e) {}
 
-console.log('🚀 JARVIS AI Initialisé avec succès !');
+console.log('🚀 JARVIS AI Initialisé avec succès ! (avec STT + voix en temps réel)');
+
 </script>
 
 </body>
