@@ -317,6 +317,24 @@ body {
     transform: translateY(0);
 }
 
+/* =================== MICROPHONE BUTTON =================== */
+.btn-mic {
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid rgba(0,234,255,0.12);
+    color: var(--accent);
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+
+.btn-mic.recording {
+    box-shadow: 0 6px 18px rgba(255, 50, 50, 0.18);
+    transform: translateY(-2px);
+    border-color: rgba(255,80,80,0.9);
+    color: #ff8b8b;
+}
+
 /* =================== STATUS PANEL =================== */
 .status-item {
     display: flex;
@@ -418,14 +436,22 @@ body {
                         >
                     </div>
 
-                    <div class="row g-2">
+                    <div class="row g-2 align-items-center">
                         <div class="col-12 col-sm-7">
                             <select id="modelSelect" class="form-select">
                                 <option value="c4ai">🤖 C4AI Aya Expanse 32B</option>
                                 <option value="cosmosrp">🌌 CosmosRP</option>
                             </select>
                         </div>
-                        <div class="col-12 col-sm-5">
+
+                        <div class="col-6 col-sm-3 d-flex">
+                            <!-- Microphone button for Speech-to-Text (STT) -->
+                            <button type="button" id="micBtn" class="btn btn-mic w-100" title="Avvia/ferma microfono">
+                                🎤 Avvia
+                            </button>
+                        </div>
+
+                        <div class="col-6 col-sm-2">
                             <button type="submit" id="sendBtn" class="btn btn-send w-100">
                                 ▶ Envoyer
                             </button>
@@ -476,7 +502,7 @@ body {
                     • Support mobile & desktop<br>
                     <br>
                     <span id="mobileVoiceNote" style="display: none; color: #ffaa00;">
-                        📱 <strong>Sur mobile:</strong> Cliquez sur "Tester la voix" ou envoyez un message pour activer le son.
+                        📱 <strong>Sur mobile:</strong> Cliquez sur "Tester la voix" ou invia un message per attivare il suono.
                     </span>
                 </div>
             </div>
@@ -495,6 +521,24 @@ let messageCount = 0;
 let voiceReady = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+// Fix per mobile: variabile per sbloccare la voce (evita errori se usata prima)
+let voiceUnlocked = false;
+function unlockVoice() {
+    // semplice flag per evitare errori di chiamata su device mobile
+    voiceUnlocked = true;
+    // alcuni device richiedono un'interazione fisica per sbloccare audio
+    try {
+        if ('speechSynthesis' in window) {
+            // play a silent utterance to unlock in some browsers
+            const u = new SpeechSynthesisUtterance('');
+            u.volume = 0;
+            window.speechSynthesis.speak(u);
+        }
+    } catch (e) {
+        // silent
+    }
+}
+
 // =================== INITIALISATION RESPONSIVEVOICE ===================
 window.addEventListener('load', function() {
     // Attendre que ResponsiveVoice soit chargé
@@ -505,8 +549,8 @@ window.addEventListener('load', function() {
             // Callback quand les voix sont prêtes
             responsiveVoice.OnVoiceReady = function() {
                 voiceReady = true;
-                const voices = responsiveVoice.getVoices();
-                const frenchVoices = voices.filter(v => v.name.includes('French'));
+                const voices = responsiveVoice.getVoices ? responsiveVoice.getVoices() : [];
+                const frenchVoices = voices.filter ? voices.filter(v => v.name && v.name.includes('French')) : [];
                 
                 console.log("✅ ResponsiveVoice prêt");
                 console.log("🔊 Voix françaises:", frenchVoices.length);
@@ -519,7 +563,7 @@ window.addEventListener('load', function() {
             };
             
             // Forcer l'initialisation
-            responsiveVoice.init();
+            try { responsiveVoice.init(); } catch (e) { /* ignore */ }
         }
     }, 100);
     
@@ -601,7 +645,7 @@ function fallbackToNativeVoice(text) {
         
         const voices = window.speechSynthesis.getVoices();
         const frenchVoice = voices.find(v => 
-            v.lang === 'fr-FR' || v.lang.startsWith('fr')
+            v.lang === 'fr-FR' || (v.lang && v.lang.startsWith && v.lang.startsWith('fr'))
         );
         
         if (frenchVoice) {
@@ -653,8 +697,120 @@ function typeWriter(text, element) {
     type();
 }
 
+// =================== SPEECH-TO-TEXT (STT) - WEB SPEECH API ===================
+// This adds a microphone button that fills the input with recognized speech (fr-FR).
+let recognition = null;
+let recognizing = false;
+const micBtn = document.getElementById('micBtn');
+const messageInput = document.getElementById('messageInput');
+
+function initSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if (!SpeechRecognition) {
+        micBtn.disabled = true;
+        micBtn.title = 'Reconnaissance vocale non supportée';
+        console.warn('SpeechRecognition non supporté par ce navigateur.');
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'fr-FR';
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false; // better for short commands/messages
+
+    recognition.onstart = function() {
+        recognizing = true;
+        micBtn.classList.add('recording');
+        micBtn.textContent = '⏺️ Enregistrement...';
+        document.getElementById('voiceStatus').textContent = '🎙️ Écoute...';
+    };
+
+    recognition.onerror = function(event) {
+        console.error('SpeechRecognition error', event);
+        recognizing = false;
+        micBtn.classList.remove('recording');
+        micBtn.textContent = '🎤 Avvia';
+        document.getElementById('voiceStatus').textContent = '⚠️ Erreur STT';
+    };
+
+    recognition.onend = function() {
+        recognizing = false;
+        micBtn.classList.remove('recording');
+        micBtn.textContent = '🎤 Avvia';
+        document.getElementById('voiceStatus').textContent = voiceReady ? '🔊 Prête (ResponsiveVoice)' : '🔊 Native (fallback)';
+    };
+
+    let finalTranscript = '';
+
+    recognition.onresult = function(event) {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const res = event.results[i];
+            if (res.isFinal) {
+                finalTranscript += res[0].transcript;
+            } else {
+                interimTranscript += res[0].transcript;
+            }
+        }
+
+        // show interim + final in input (but don't submit automatically)
+        messageInput.value = (finalTranscript + ' ' + interimTranscript).trim();
+    };
+
+    // If the user wants automatic submit on final result, uncomment below.
+    recognition.onresult = function(event) {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const res = event.results[i];
+            if (res.isFinal) {
+                finalTranscript += res[0].transcript + ' ';
+            } else {
+                interimTranscript += res[0].transcript;
+            }
+        }
+        messageInput.value = (finalTranscript + interimTranscript).trim();
+    };
+}
+
+if (micBtn) {
+    initSpeechRecognition();
+    micBtn.addEventListener('click', () => {
+        // ensure voice unlocked on mobile when user interacts
+        if (isMobile && !voiceUnlocked) {
+            unlockVoice();
+        }
+
+        if (!recognition) {
+            return;
+        }
+        if (recognizing) {
+            recognition.stop();
+            recognizing = false;
+            micBtn.classList.remove('recording');
+            micBtn.textContent = '🎤 Avvia';
+        } else {
+            // start recognition
+            finalTranscript = '';
+            try {
+                recognition.start();
+            } catch (e) {
+                // Some browsers throw if start() called twice quickly - handle gracefully
+                console.warn('recognition.start() exception', e);
+            }
+        }
+    });
+}
+
 // =================== GESTION DU FORMULAIRE ===================
-document.getElementById('chatForm').addEventListener('submit', async (e) => {
+// IMPORTANT: use a stable endpoint for fetch so mobile devices don't fail.
+// Using PHP_SELF ensures the POST target is the executing script.
+const chatForm = document.getElementById('chatForm');
+const sendBtn = document.getElementById('sendBtn');
+const modelSelect = document.getElementById('modelSelect');
+const chatWindow = document.getElementById('chatWindow');
+
+chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     // DÉVERROUILLAGE VOCAL sur mobile au premier clic
@@ -662,11 +818,6 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         unlockVoice();
     }
 
-    const messageInput = document.getElementById('messageInput');
-    const modelSelect = document.getElementById('modelSelect');
-    const sendBtn = document.getElementById('sendBtn');
-    const chatWindow = document.getElementById('chatWindow');
-    
     const userMessage = messageInput.value.trim();
     const selectedModel = modelSelect.value;
 
@@ -702,20 +853,28 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     };
     document.getElementById('currentModel').textContent = modelNames[selectedModel];
 
-    // Vider l'input
+    // Vider l'input (UX: keep a copy if you want)
     messageInput.value = '';
 
     try {
+
         // Envoyer la requête AJAX
         const formData = new FormData();
         formData.append('message', userMessage);
         formData.append('model', selectedModel);
         formData.append('ajax', 'true');
 
-        const response = await fetch(window.location.href, {
+        // Use stable target: current script file (PHP_SELF)
+        const response = await fetch('<?php echo $_SERVER['PHP_SELF']; ?>', {
             method: 'POST',
-            body: formData
+            body: formData,
+            credentials: 'same-origin'
         });
+
+        // Fail early if not ok
+        if (!response.ok) {
+            throw new Error('HTTP error ' + response.status);
+        }
 
         const data = await response.json();
 
@@ -737,7 +896,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
             chatWindow.appendChild(debugDiv);
         }
 
-        // Animation typing
+        // Animation typing — same behavior as before
         typeWriter(data.message, typingSpan);
 
         // Scroll final
@@ -755,9 +914,11 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 });
 
 // =================== FOCUS AUTOMATIQUE ===================
-document.getElementById('messageInput').focus();
+try { document.getElementById('messageInput').focus(); } catch (e) {}
 
-console.log('🚀 JARVIS AI Initialisé avec succès !');
+// Helpful console banner
+console.log('🚀 JARVIS AI Initialisé avec succès ! (avec fix mobile + STT)');
+
 </script>
 
 </body>
