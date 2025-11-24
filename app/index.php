@@ -467,4 +467,3 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
   </script>
 </body>
 </html>
-
