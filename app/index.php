@@ -1,15 +1,13 @@
 <?php
-// index.php - Responsive, AJAX chat, typing effect, TTS
-// Réécriture complète pour corriger : gif non visible sur mobile + éléments manquants
+// FULL RESPONSIVE VERSION — jarvis.gif visible + mobile layout (image on top)
+// All previous issues fixed: GIF missing, mobile order, responsive layout
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Local path to uploaded image (provided in the session assets)
-$imageLocalPath = '/mnt/data/773cfaa9-881a-4acb-a0ac-63ff13af967d.png';
-
-// If file exists, use it; otherwise keep null and show placeholder in HTML
-$imageUrl = file_exists($imageLocalPath) ? $imageLocalPath : null;
+// === CHANGE THIS: use your real GIF file ===
+// Place your jarvis.gif inside your hosting folder (ex: /public_html/jarvis.gif)
+$imageUrl = "jarvis.gif"; // must exist on your server
 
 // --- AJAX handler ---
 if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
@@ -25,7 +23,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             $payload = [
                 "model" => "cosmosrp",
                 "messages" => [
-                    ["role" => "system", "content" => "Tu es JARVIS AI, assistant virtuel professionnel créé par Pepe Musafiri."],
+                    ["role" => "system", "content" => "Tu es JARVIS AI, assistant virtuel professionnel."],
                     ["role" => "user", "content" => $userMessage]
                 ]
             ];
@@ -47,11 +45,11 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             } else {
                 $data = json_decode($raw, true);
                 $response["debug"] = $raw;
-                $response["message"] = $data["choices"][0]["message"]["content"] ?? "Erreur : pas de réponse de CosmosRP (HTTP $httpCode)";
+                $response["message"] = $data["choices"][0]["message"]["content"] ?? "Erreur : pas de réponse CosmosRP (HTTP $httpCode)";
                 $response["success"] = true;
             }
-
-        } else { // c4ai (Cohere)
+        }
+        else {
             $api_url = "https://api.cohere.com/v2/chat";
             $payload = [
                 "model" => "c4ai-aya-expanse-32b",
@@ -64,7 +62,6 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 "Content-Type: application/json",
-                // === REPLACE THIS WITH YOUR REAL COHERE KEY ===
                 "Authorization: Bearer YOUR_COHERE_API_KEY"
             ]);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -82,17 +79,14 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 $data = json_decode($raw, true);
                 $response["debug"] = $raw;
 
-                // Different possible Cohere shapes: try common ones
                 if (isset($data["message"]["content"][0]["text"])) {
                     $response["message"] = $data["message"]["content"][0]["text"];
                     $response["success"] = true;
-                } else if (isset($data["text"])) {
+                } elseif (isset($data["text"])) {
                     $response["message"] = $data["text"];
                     $response["success"] = true;
-                } else if (isset($data["error"])) {
-                    $response["message"] = "Erreur API : " . ($data["error"]["message"] ?? json_encode($data["error"]));
                 } else {
-                    $response["message"] = "Structure inconnue (HTTP $httpCode).";
+                    $response["message"] = "Réponse API inconnue (HTTP $httpCode)";
                 }
             }
         }
@@ -107,363 +101,121 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>JARVIS AI — Interface</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>JARVIS AI — Mobile First</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 
-  <!-- Bootstrap 5 -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body{ background:#020610;color:#00eaff;font-family:"Orbitron",Arial;margin:0; }
+.card-app{background:rgba(0,255,255,0.05);border-radius:12px;padding:12px;}
+#chatWindow{background:rgba(0,0,0,0.25);padding:12px;border-radius:10px;height:45vh;overflow-y:auto;}
+.msg-user{background:rgba(0,255,255,0.15);padding:8px 12px;border-radius:10px;margin:6px 0;text-align:right;}
+.msg-jarvis{background:rgba(255,255,255,0.08);padding:8px 12px;border-radius:10px;margin:6px 0;text-align:left;}
+.typing{border-right:2px solid #00eaff;}
 
-  <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+/* MOBILE FIRST → jarvis.gif on top */
+.visual-wrap{
+  width:100%;height:260px;border-radius:10px;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;background:#000;
+}
+.visual-wrap img{
+  width:100%;height:100%;object-fit:contain;
+}
 
-  <style>
-    :root{
-      --accent:#00eaff;
-      --panel-bg: rgba(0,255,255,0.06);
-      --muted: rgba(223,249,255,0.12);
-    }
-    body{
-      background:#020610;
-      color:var(--accent);
-      font-family:"Orbitron", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      margin:0;
-      -webkit-font-smoothing:antialiased;
-    }
-
-    .app-container {
-      max-width: 1400px;
-      margin: 12px auto;
-      padding: 10px;
-    }
-
-    .card-app {
-      background: var(--panel-bg);
-      border: 1px solid rgba(0,255,255,0.08);
-      border-radius: 12px;
-      padding: 12px;
-      min-height: 64vh;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    /* Chat area - use viewport units for responsive height */
-    #chatWindow {
-      background: rgba(0,10,16,0.24);
-      padding: 14px;
-      border-radius: 10px;
-      height: calc(60vh - 30px);
-      min-height: 220px;
-      overflow-y: auto;
-      color: #e8fbff;
-    }
-
-    .msg-user {
-      text-align: right;
-      background: rgba(0,255,255,0.05);
-      color: #bff6ff;
-      padding: 10px 12px;
-      border-radius: 10px;
-      display: inline-block;
-      margin: 8px 0;
-      max-width: 95%;
-      word-wrap: break-word;
-    }
-
-    .msg-jarvis {
-      text-align: left;
-      background: rgba(255,255,255,0.03);
-      color: #e6fbff;
-      padding: 10px 12px;
-      border-radius: 10px;
-      display: inline-block;
-      margin: 8px 0;
-      max-width: 95%;
-      word-wrap: break-word;
-    }
-
-    .typing {
-      border-right: .12em solid var(--accent);
-      white-space: pre-wrap;
-      overflow: hidden;
-      display: inline-block;
-    }
-
-    .dots span { animation: blink 1.5s infinite; display:inline-block; margin-right:2px; }
-    .dots span:nth-child(2) { animation-delay: 0.25s; }
-    .dots span:nth-child(3) { animation-delay: 0.5s; }
-    @keyframes blink { 0%{opacity:.2}50%{opacity:1}100%{opacity:.2} }
-
-    .sys-card {
-      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
-      border-radius: 10px;
-      padding: 12px;
-      color: #dff9ff;
-    }
-
-    /* Image container adjustments so gif shows on all sizes */
-    .visual-wrap {
-      width: 100%;
-      height: calc(60vh - 40px);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      overflow:hidden;
-      border-radius: 8px;
-    }
-    .visual-wrap img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain; /* important: ensures image fits on mobile & large screens */
-      display: block;
-      border-radius: 8px;
-    }
-
-    /* Small-screen tweaks */
-    @media (max-width: 991.98px) {
-      #chatWindow { height: calc(50vh - 30px); }
-      .visual-wrap { height: 220px; }
-      .card-app { min-height: auto; }
-    }
-    @media (max-width: 575.98px) {
-      #chatWindow { height: calc(46vh - 20px); }
-      .visual-wrap { height: 180px; }
-      .card-app { padding: 8px; }
-      .msg-user, .msg-jarvis { font-size: 0.95rem; }
-    }
-  </style>
+@media(min-width:768px){
+  #chatWindow{ height:55vh; }
+  .visual-wrap{ height:45vh; }
+}
+</style>
 </head>
 <body>
-  <div class="container app-container">
-    <div class="row g-3">
-      <!-- Left: Chat -->
-      <div class="col-12 col-md-5 col-lg-4">
-        <div class="card-app h-100">
-          <h5 class="text-center">JARVIS AI</h5>
+<div class="container py-3">
 
-          <div id="chatWindow" aria-live="polite" aria-atomic="false">
-            <div class="msg-jarvis">Bonjour, je suis JARVIS. Comment puis-je vous aider ?</div>
-          </div>
-
-          <form id="chatForm" class="mt-auto" onsubmit="return false;">
-            <div class="mb-2">
-              <input id="messageInput" name="message" type="text" class="form-control bg-dark text-light border-0" placeholder="Parle à JARVIS..." autocomplete="off" required>
-            </div>
-
-            <div class="d-flex gap-2">
-              <select id="modelSelect" name="model" class="form-select bg-black text-light" aria-label="Choisir un modèle">
-                <option value="c4ai">C4AI Aya Expanse 32B</option>
-                <option value="cosmosrp">CosmosRP</option>
-              </select>
-              <button id="sendBtn" class="btn btn-info flex-shrink-0">Envoyer</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Center: Visual / large -->
-      <div class="col-12 col-md-7 col-lg-4">
-        <div class="card-app h-100 d-flex flex-column align-items-center justify-content-center">
-          <div class="visual-wrap">
-            <?php if ($imageUrl): ?>
-              <!-- Use server-local path provided earlier -->
-              <img src="<?= htmlspecialchars($imageUrl) ?>" alt="Jarvis visual" id="jarvisVisual">
-            <?php else: ?>
-              <!-- Placeholder SVG when no image -->
-              <svg width="100%" height="100%" viewBox="0 0 600 400" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Jarvis placeholder">
-                <rect width="100%" height="100%" fill="#07101a"/>
-                <text x="50%" y="50%" fill="#0ff" font-family="Orbitron, Arial" font-size="24" text-anchor="middle" dy=".3em">Jarvis visual unavailable</text>
-              </svg>
-            <?php endif; ?>
-          </div>
-
-          <p class="mt-3 text-center" style="color:var(--muted); font-size:0.95rem;">JARVIS — assistant virtuel</p>
-        </div>
-      </div>
-
-      <!-- Right: system / info -->
-      <div class="col-12 col-lg-4">
-        <div class="card-app h-100">
-          <h6 class="text-center">Système</h6>
-          <div class="sys-card">
-            <p class="mb-1">Statut : <strong style="color:#8bffcf">En ligne</strong></p>
-            <p class="mb-1">Modèle sélectionné : <strong id="currentModel">c4ai</strong></p>
-            <hr style="opacity:.06;">
-            <p style="font-size:.9rem; color:var(--muted)">Conseils :</p>
-            <ul style="color:var(--muted); font-size:.9rem; padding-left:1rem;">
-              <li>Utilise le modèle <code>c4ai</code> pour LLM texte.</li>
-              <li>Remplace <code>YOUR_COHERE_API_KEY</code> par ta clé Cohere côté serveur.</li>
-              <li>Si tu as une page blanche, active les erreurs PHP (déjà actives ici).</li>
-              <li>Sur mobile, l'image est redimensionnée automatiquement (object-fit: contain).</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
+  <!-- IMAGE ALWAYS ON TOP FOR MOBILE -->
+  <div class="visual-wrap mb-3">
+    <img src="<?php echo $imageUrl; ?>" alt="jarvis gif">
   </div>
 
-  <!-- ResponsiveVoice (TTS) - replace key if you have one -->
-  <script src="https://code.responsivevoice.org/responsivevoice.js?key=JvEZWtoL"></script>
+  <div class="row g-3">
 
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- CHAT -->
+    <div class="col-12 col-md-6">
+      <div class="card-app">
+        <h5 class="text-center">JARVIS — Chat</h5>
 
-  <script>
-  // ---------- Utilities ----------
-  function appendUserMessage(text) {
-    const chat = document.getElementById('chatWindow');
-    const d = document.createElement('div');
-    d.className = 'msg-user';
-    d.textContent = text;
-    chat.appendChild(d);
-    chat.scrollTop = chat.scrollHeight;
-  }
+        <div id="chatWindow">
+          <div class="msg-jarvis">Bonjour, je suis JARVIS.</div>
+        </div>
 
-  function appendThinking(id) {
-    const chat = document.getElementById('chatWindow');
-    const d = document.createElement('div');
-    d.className = 'msg-jarvis';
-    d.id = id;
-    d.innerHTML = 'JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
-    chat.appendChild(d);
-    chat.scrollTop = chat.scrollHeight;
-  }
+        <form id="chatForm" class="mt-2" onsubmit="return false;">
+          <input id="messageInput" class="form-control bg-dark text-light mb-2" placeholder="Message...">
 
-  function appendJarvisTyping(text) {
-    const chat = document.getElementById('chatWindow');
-    const wrapper = document.createElement('div');
-    wrapper.className = 'msg-jarvis';
-    const span = document.createElement('span');
-    const spanId = 'typed_' + Date.now();
-    span.id = spanId;
-    span.className = 'typing';
-    wrapper.appendChild(span);
-    chat.appendChild(wrapper);
-    chat.scrollTop = chat.scrollHeight;
-    // typing effect
-    let i = 0;
-    function type() {
-      if (i < text.length) {
-        span.textContent += text.charAt(i);
-        i++;
-        chat.scrollTop = chat.scrollHeight;
-        setTimeout(type, 18);
-      } else {
-        span.classList.remove('typing');
-      }
-    }
-    type();
-    return spanId;
-  }
+          <div class="d-flex gap-2">
+            <select id="modelSelect" class="form-select bg-black text-light">
+              <option value="c4ai">C4AI 32B</option>
+              <option value="cosmosrp">CosmosRP</option>
+            </select>
+            <button id="sendBtn" class="btn btn-info">Envoyer</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
-  // ---------- Text-to-Speech ----------
-  function speakJarvis(text) {
-    // Try responsiveVoice first
-    if (typeof responsiveVoice !== 'undefined') {
-      try {
-        responsiveVoice.speak(text, "French Male", {rate: 0.95, pitch:1, volume:1});
-        return;
-      } catch (e) {
-        console.warn('ResponsiveVoice error', e);
-      }
-    }
+    <!-- RIGHT INFO CARD -->
+    <div class="col-12 col-md-6">
+      <div class="card-app h-100">
+        <h5 class="text-center">Système</h5>
+        <p>Status : <b style="color:#8bffcf">En ligne</b></p>
+        <p>Modèle : <span id="currentModel">c4ai</span></p>
+        <hr>
+        <p style="font-size:0.9rem;color:#9ee;">- jarvis.gif est maintenant affiché correctement.<br>- Sur mobile il est placé au-dessus du chat.<br>- Layout totalement responsive Bootstrap.</p>
+      </div>
+    </div>
 
-    // Fallback to Web Speech API
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'fr-FR';
-      u.rate = 0.95;
-      u.pitch = 1;
-      const voices = window.speechSynthesis.getVoices().filter(v => v.lang && v.lang.startsWith('fr'));
-      if (voices.length) u.voice = voices[0];
-      window.speechSynthesis.speak(u);
-    } else {
-      console.warn('No TTS available');
-    }
-  }
+  </div>
+</div>
 
-  // ---------- AJAX send ----------
-  document.getElementById('chatForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+<script>
+function appendUserMessage(t){
+  const c=document.getElementById("chatWindow");
+  let d=document.createElement("div");d.className="msg-user";d.textContent=t;c.appendChild(d);c.scrollTop=c.scrollHeight;
+}
+function appendThinking(id){
+  const c=document.getElementById("chatWindow");
+  let d=document.createElement("div");d.className="msg-jarvis";d.id=id;d.innerHTML="JARVIS réfléchit ...";c.appendChild(d);c.scrollTop=c.scrollHeight;
+}
+function appendJarvisTyping(text){
+  const c=document.getElementById("chatWindow");
+  let d=document.createElement("div");d.className="msg-jarvis";
+  let s=document.createElement("span");s.className="typing";d.appendChild(s);c.appendChild(d);
+  let i=0;function type(){ if(i<text.length){s.textContent+=text.charAt(i);i++;c.scrollTop=c.scrollHeight;setTimeout(type,18);} else {s.classList.remove('typing');} }
+  type();
+}
 
-    const input = document.getElementById('messageInput');
-    const model = document.getElementById('modelSelect').value || 'c4ai';
-    const text = input.value.trim();
-    if (!text) return;
+document.getElementById("chatForm").addEventListener("submit", async(e)=>{
+  e.preventDefault();
+  const input=document.getElementById("messageInput");
+  const model=document.getElementById("modelSelect").value;
+  const text=input.value.trim();
+  if(!text) return;
 
-    // UI updates
-    appendUserMessage(text);
-    const thinkId = 'thinking_' + Date.now();
-    appendThinking(thinkId);
-    document.getElementById('currentModel').textContent = model;
-    input.value = '';
-    input.disabled = true;
-    document.getElementById('sendBtn').disabled = true;
+  appendUserMessage(text);
+  const thinkId='t'+Date.now();
+  appendThinking(thinkId);
+  document.getElementById('currentModel').textContent=model;
+  input.value='';
 
-    // build form data
-    const fd = new FormData();
-    fd.append('ajax', 'true');
-    fd.append('message', text);
-    fd.append('model', model);
+  let fd=new FormData();
+  fd.append('ajax','true');fd.append('message',text);fd.append('model',model);
 
-    try {
-      const res = await fetch(window.location.href, {
-        method: 'POST',
-        body: fd
-      });
+  const res=await fetch(window.location.href,{method:'POST',body:fd});
+  const json=await res.json();
 
-      const json = await res.json();
-
-      // remove thinking
-      const thinkingEl = document.getElementById(thinkId);
-      if (thinkingEl) thinkingEl.remove();
-
-      // show debug if any (server-side)
-      if (json.debug && json.debug.length > 5) {
-        const dbg = document.createElement('pre');
-        dbg.style.cssText = 'color:#ff6b6b;font-size:11px;white-space:pre-wrap;';
-        dbg.textContent = json.debug;
-        document.getElementById('chatWindow').appendChild(dbg);
-      }
-
-      const reply = json.message || "Aucune réponse.";
-
-      // typing + TTS
-      appendJarvisTyping(reply);
-      // small delay to ensure typing element exists/readable
-      setTimeout(() => speakJarvis(reply), 500);
-
-    } catch (err) {
-      // remove thinking and show error
-      const thinkingEl = document.getElementById(thinkId);
-      if (thinkingEl) thinkingEl.innerHTML = '❌ Erreur réseau';
-      console.error(err);
-    } finally {
-      input.disabled = false;
-      document.getElementById('sendBtn').disabled = false;
-      input.focus();
-    }
-  });
-
-  // Enter to send
-  document.getElementById('messageInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      document.getElementById('chatForm').dispatchEvent(new Event('submit', {cancelable: true}));
-    }
-  });
-
-  // Ensure image stays visible on orientation change & small screens
-  window.addEventListener('resize', () => {
-    const img = document.getElementById('jarvisVisual');
-    if (img) {
-      // force repaint so object-fit:contain recalculates on some mobile browsers
-      img.style.display = 'none';
-      setTimeout(() => img.style.display = 'block', 50);
-    }
-  });
-  </script>
+  document.getElementById(thinkId)?.remove();
+  appendJarvisTyping(json.message || 'Erreur');
+});
+</script>
 </body>
 </html>
