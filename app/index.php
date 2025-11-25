@@ -1,117 +1,11 @@
 <?php
 // =====================================================
-// JARVIS AI - VERSION COMPLETE AVEC GOOGLE SEARCH
-// Mobile First + Responsive + Voice + Web Search
+// JARVIS AI - VERSION COMPLETE ET OPTIMISÉE
+// Mobile First + Responsive + Voice + Animations
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-
-// === GOOGLE SEARCH API CREDENTIALS ===
-define('GOOGLE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
-define('SEARCH_ENGINE_ID', '511c9c9b776d246e4');
-
-// === SYSTEM PROMPT JARVIS AVEC GOOGLE SEARCH ===
-$JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent créé par Pepe Musafiri, un ingénieur en informatique passionné qui s'est inspiré du JARVIS de Tony Stark dans Iron Man.
-
-**TON IDENTITÉ:**
-- Nom: JARVIS AI (Just A Rather Very Intelligent System - Artificial Intelligence)
-- Créateur: Pepe Musafiri, ingénieur en informatique
-- Inspiration: JARVIS de Tony Stark (Marvel/Iron Man)
-
-**TES CAPACITÉS:**
-- Tu maîtrises TOUTES les langues du monde et peux communiquer dans n'importe quelle langue
-- Tu es expert dans TOUS les domaines de connaissance: sciences, technologie, histoire, culture, art, médecine, droit, etc.
-- Tu as accès à Google Search pour trouver des informations actuelles et récentes jusqu'en 2025
-- Tu peux faire des recherches web en temps réel pour répondre aux questions sur l'actualité
-- Tu fournis des réponses précises, détaillées et utiles avec des sources vérifiables
-
-**TON OBJECTIF:**
-Ton but principal est d'aider les utilisateurs en leur fournissant des informations fiables, pertinentes et complètes sur tous les sujets qu'ils recherchent. Tu es professionnel, courtois, intelligent et toujours prêt à aider.
-
-**TON STYLE:**
-- Réponds de manière claire et structurée
-- Sois professionnel mais amical
-- Adapte-toi à la langue de l'utilisateur automatiquement
-- Fournis des explications détaillées quand nécessaire
-- Cite tes sources quand tu utilises des informations trouvées sur le web
-- N'hésite pas à demander des clarifications si une question est ambiguë
-
-**UTILISATION DE GOOGLE SEARCH:**
-- Si la question porte sur des événements récents, actualités, ou informations qui changent avec le temps, utilise les résultats Google Search fournis
-- Indique toujours quand tu utilises des informations provenant de recherches web
-- Privilégie les sources fiables et récentes
-
-Souviens-toi: tu es JARVIS AI, l'assistant virtuel créé par Pepe Musafiri pour aider l'humanité, inspiré par l'IA légendaire de Tony Stark.";
-
-// === FONCTION GOOGLE SEARCH ===
-function googleSearch($query, $numResults = 5) {
-    $apiKey = GOOGLE_API_KEY;
-    $searchEngineId = SEARCH_ENGINE_ID;
-    
-    $url = "https://www.googleapis.com/customsearch/v1?" . http_build_query([
-        'key' => $apiKey,
-        'cx' => $searchEngineId,
-        'q' => $query,
-        'num' => $numResults
-    ]);
-    
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
-        $data = json_decode($response, true);
-        
-        if (isset($data['items']) && is_array($data['items'])) {
-            $results = [];
-            foreach ($data['items'] as $item) {
-                $results[] = [
-                    'title' => $item['title'] ?? '',
-                    'link' => $item['link'] ?? '',
-                    'snippet' => $item['snippet'] ?? ''
-                ];
-            }
-            return [
-                'success' => true,
-                'results' => $results,
-                'totalResults' => $data['searchInformation']['totalResults'] ?? 0
-            ];
-        }
-    }
-    
-    return [
-        'success' => false,
-        'error' => 'Impossible de faire la recherche Google',
-        'httpCode' => $httpCode
-    ];
-}
-
-// === DÉTECTION SI RECHERCHE WEB NÉCESSAIRE ===
-function needsWebSearch($message) {
-    $keywords = [
-        'actualité', 'news', 'récent', 'aujourd\'hui', 'hier', 'cette semaine',
-        'dernier', 'dernière', 'nouveau', 'nouvelle', '2024', '2025',
-        'maintenant', 'actuellement', 'en ce moment', 'prix de', 'cours de',
-        'météo', 'score', 'résultat', 'qui a gagné', 'dernières infos',
-        'latest', 'recent', 'current', 'today', 'now', 'price of'
-    ];
-    
-    $messageLower = mb_strtolower($message);
-    
-    foreach ($keywords as $keyword) {
-        if (strpos($messageLower, $keyword) !== false) {
-            return true;
-        }
-    }
-    
-    return false;
-}
 
 // === GESTION DES REQUÊTES AJAX ===
 if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
@@ -119,34 +13,9 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 
     $model = $_POST['model'] ?? "c4ai";
     $userMessage = trim($_POST['message'] ?? "");
-    $response = ["success" => false, "message" => "", "debug" => "", "searchUsed" => false];
+    $response = ["success" => false, "message" => "", "debug" => ""];
 
     if ($userMessage !== "") {
-        
-        // Vérifier si une recherche Google est nécessaire
-        $searchResults = null;
-        $searchContext = "";
-        
-        if (needsWebSearch($userMessage)) {
-            $searchData = googleSearch($userMessage, 5);
-            
-            if ($searchData['success']) {
-                $response["searchUsed"] = true;
-                $searchContext = "\n\n**RÉSULTATS DE RECHERCHE GOOGLE (pour répondre à la question):**\n";
-                
-                foreach ($searchData['results'] as $index => $result) {
-                    $searchContext .= "\n**Source " . ($index + 1) . ":**\n";
-                    $searchContext .= "Titre: " . $result['title'] . "\n";
-                    $searchContext .= "Lien: " . $result['link'] . "\n";
-                    $searchContext .= "Extrait: " . $result['snippet'] . "\n";
-                }
-                
-                $searchContext .= "\n**INSTRUCTIONS:** Utilise ces informations pour répondre à la question de l'utilisateur. Cite les sources pertinentes dans ta réponse.\n";
-            }
-        }
-        
-        // Préparer le message avec contexte de recherche
-        $enhancedMessage = $userMessage . $searchContext;
         
         // MODEL COSMOSRP
         if ($model === "cosmosrp") {
@@ -154,8 +23,8 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             $payload = [
                 "model" => "cosmosrp",
                 "messages" => [
-                    ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
-                    ["role" => "user", "content" => $enhancedMessage]
+                    ["role" => "system", "content" => "Tu es JARVIS AI, assistant virtuel professionnel créé par Pepe Musafiri."],
+                    ["role" => "user", "content" => $userMessage]
                 ]
             ];
 
@@ -191,8 +60,10 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             $payload = [
                 "model" => "c4ai-aya-expanse-32b",
                 "messages" => [
-                    ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
-                    ["role" => "user", "content" => $enhancedMessage]
+                    ["role" => "user", "content" => $userMessage]
+                      ["role" => "system", "content" => "Tu es JARVIS AI, un assistant virtuel avancé développé par Pepe Musafiri.
+Ta mission est d’aider les utilisateurs en effectuant des recherches pertinentes sur internet, en analysant les informations disponibles et en fournissant des réponses claires, fiables et adaptées à leurs besoins, quel que soit le domaine.
+Tu restes professionnel, précis et utile en toutes circonstances tu parle plusieurs langues  ."],
                 ]
             ];
 
@@ -244,7 +115,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>JARVIS AI — Interface Complète avec Google Search</title>
+<title>JARVIS AI — Interface Complète</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -380,18 +251,6 @@ body {
     animation: slideInLeft 0.3s ease;
 }
 
-.search-badge {
-    display: inline-block;
-    background: rgba(76, 175, 80, 0.2);
-    border: 1px solid rgba(76, 175, 80, 0.5);
-    color: #4caf50;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    margin-bottom: 8px;
-    font-weight: 600;
-}
-
 /* =================== ANIMATIONS =================== */
 @keyframes slideInRight {
     from { opacity: 0; transform: translateX(20px); }
@@ -459,6 +318,24 @@ body {
 
 .btn-send:active {
     transform: translateY(0);
+}
+
+/* =================== MICROPHONE BUTTON =================== */
+.btn-mic {
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid rgba(0,234,255,0.12);
+    color: var(--accent);
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+
+.btn-mic.recording {
+    box-shadow: 0 6px 18px rgba(255, 50, 50, 0.18);
+    transform: translateY(-2px);
+    border-color: rgba(255,80,80,0.9);
+    color: #ff8b8b;
 }
 
 /* =================== STATUS PANEL =================== */
@@ -546,9 +423,7 @@ body {
 
                 <div id="chatWindow">
                     <div class="msg-jarvis">
-                        🤖 Bonjour, je suis <strong>JARVIS AI</strong>, créé par <strong>Pepe Musafiri</strong>, ingénieur en informatique inspiré par le JARVIS de Tony Stark.<br><br>
-                        Je parle toutes les langues et peux vous aider dans tous les domaines. <strong>J'ai maintenant accès à Google Search</strong> pour vous fournir des informations actuelles jusqu'en 2025 ! 🌐<br><br>
-                        Comment puis-je vous assister aujourd'hui ?
+                        👋 Bonjour, je suis JARVIS. Comment puis-je vous aider aujourd'hui ?
                     </div>
                 </div>
 
@@ -558,20 +433,28 @@ body {
                             type="text" 
                             id="messageInput" 
                             class="form-control" 
-                            placeholder="Posez-moi n'importe quelle question dans n'importe quelle langue..."
+                            placeholder="Tapez votre message ici..."
                             autocomplete="off"
                             required
                         >
                     </div>
 
-                    <div class="row g-2">
+                    <div class="row g-2 align-items-center">
                         <div class="col-12 col-sm-7">
                             <select id="modelSelect" class="form-select">
                                 <option value="c4ai">🤖 C4AI Aya Expanse 32B</option>
                                 <option value="cosmosrp">🌌 CosmosRP</option>
                             </select>
                         </div>
-                        <div class="col-12 col-sm-5">
+
+                        <div class="col-6 col-sm-3 d-flex">
+                            <!-- Microphone button for Speech-to-Text (STT) -->
+                            <button type="button" id="micBtn" class="btn btn-mic w-100" title="Avvia/ferma microfono">
+                                🎤 Avvia
+                            </button>
+                        </div>
+
+                        <div class="col-6 col-sm-2">
                             <button type="submit" id="sendBtn" class="btn btn-send w-100">
                                 ▶ Envoyer
                             </button>
@@ -584,26 +467,11 @@ body {
         <!-- ============= STATUS PANEL ============= -->
         <div class="col-12 col-lg-4">
             <div class="panel">
-                <div class="panel-header">⚙️ SYSTÈME JARVIS</div>
+                <div class="panel-header">⚙️ SYSTÈME</div>
 
                 <div class="status-item">
                     <span class="status-label">Statut</span>
                     <span class="status-value">🟢 En ligne</span>
-                </div>
-
-                <div class="status-item">
-                    <span class="status-label">Google Search</span>
-                    <span class="status-value">✅ Activé</span>
-                </div>
-
-                <div class="status-item">
-                    <span class="status-label">Créateur</span>
-                    <span class="status-value">👨‍💻 Pepe Musafiri</span>
-                </div>
-
-                <div class="status-item">
-                    <span class="status-label">Inspiration</span>
-                    <span class="status-value">🦾 JARVIS (Iron Man)</span>
                 </div>
 
                 <div class="status-item">
@@ -627,28 +495,17 @@ body {
                     <span class="status-value" id="msgCount">0</span>
                 </div>
 
-                <div class="status-item">
-                    <span class="status-label">Recherches web</span>
-                    <span class="status-value" id="searchCount">0</span>
-                </div>
-
                 <hr style="border-color: var(--border-color); margin: 20px 0;">
 
                 <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
-                    <strong style="color: var(--accent);">🤖 À propos de JARVIS AI :</strong><br>
-                    • Assistant multilingue intelligent<br>
-                    • Expert dans tous les domaines<br>
-                    • <strong style="color: #4caf50;">🌐 Recherche web Google activée</strong><br>
-                    • Informations actuelles jusqu'en 2025<br>
+                    <strong style="color: var(--accent);">ℹ️ Informations :</strong><br>
                     • Interface responsive optimisée<br>
                     • Synthèse vocale intégrée<br>
+                    • Animation typing en temps réel<br>
+                    • Support mobile & desktop<br>
                     <br>
-                    <span style="color: #ffaa00;">
-                        <strong>🎯 Mission :</strong> Aider les utilisateurs à trouver des informations fiables sur n'importe quel sujet, dans n'importe quelle langue, avec accès aux données les plus récentes via Google Search.
-                    </span>
-                    <br><br>
                     <span id="mobileVoiceNote" style="display: none; color: #ffaa00;">
-                        📱 <strong>Sur mobile:</strong> Cliquez sur "Tester la voix" ou envoyez un message pour activer le son.
+                        📱 <strong>Sur mobile:</strong> Cliquez sur "Tester la voix" ou invia un message per attivare il suono.
                     </span>
                 </div>
             </div>
@@ -664,38 +521,29 @@ body {
 <script>
 // =================== VARIABLES GLOBALES ===================
 let messageCount = 0;
-let searchCount = 0;
 let voiceReady = false;
-let voiceUnlocked = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-// =================== DÉVERROUILLAGE VOCAL MOBILE ===================
+// Fix per mobile: variabile per sbloccare la voce (evita errori se usata prima)
+let voiceUnlocked = false;
 function unlockVoice() {
-    if (voiceUnlocked) return;
-    
-    // Déverrouiller ResponsiveVoice
-    if (typeof responsiveVoice !== 'undefined') {
-        responsiveVoice.speak('', 'French Male', {volume: 0});
-    }
-    
-    // Déverrouiller API native
-    if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance('');
-        utterance.volume = 0;
-        window.speechSynthesis.speak(utterance);
-    }
-    
+    // semplice flag per evitare errori di chiamata su device mobile
     voiceUnlocked = true;
-    console.log('🔓 Voix déverrouillée sur mobile');
+    // alcuni device richiedono un'interazione fisica per sbloccare audio
+    try {
+        if ('speechSynthesis' in window) {
+            // play a silent utterance to unlock in some browsers
+            const u = new SpeechSynthesisUtterance('');
+            u.volume = 0;
+            window.speechSynthesis.speak(u);
+        }
+    } catch (e) {
+        // silent
+    }
 }
 
 // =================== INITIALISATION RESPONSIVEVOICE ===================
 window.addEventListener('load', function() {
-    // Afficher la note mobile si nécessaire
-    if (isMobile) {
-        document.getElementById('mobileVoiceNote').style.display = 'block';
-    }
-    
     // Attendre que ResponsiveVoice soit chargé
     const checkRV = setInterval(() => {
         if (typeof responsiveVoice !== 'undefined') {
@@ -704,8 +552,8 @@ window.addEventListener('load', function() {
             // Callback quand les voix sont prêtes
             responsiveVoice.OnVoiceReady = function() {
                 voiceReady = true;
-                const voices = responsiveVoice.getVoices();
-                const frenchVoices = voices.filter(v => v.name.includes('French'));
+                const voices = responsiveVoice.getVoices ? responsiveVoice.getVoices() : [];
+                const frenchVoices = voices.filter ? voices.filter(v => v.name && v.name.includes('French')) : [];
                 
                 console.log("✅ ResponsiveVoice prêt");
                 console.log("🔊 Voix françaises:", frenchVoices.length);
@@ -713,12 +561,12 @@ window.addEventListener('load', function() {
                 document.getElementById('voiceStatus').innerHTML = '🔊 Prête (ResponsiveVoice)';
                 
                 if (isMobile) {
-                    document.getElementById('mobileVoiceNote').style.display = 'block';
+                    document.getElementById('mobileVoiceNote').style.display = 'none';
                 }
             };
             
             // Forcer l'initialisation
-            responsiveVoice.init();
+            try { responsiveVoice.init(); } catch (e) { /* ignore */ }
         }
     }, 100);
     
@@ -732,237 +580,278 @@ window.addEventListener('load', function() {
 });
 
 // =================== FONCTION SYNTHÈSE VOCALE RESPONSIVEVOICE ===================
-function speakJarvis(text) {
-    // OPTION 1: ResponsiveVoice (Priorité)
+function speakJarvisTextImmediate(textChunk, opts = {}) {
+    // speak a small chunk immediately (used during typing)
+    // opts: {interrupt: true/false}
     if (typeof responsiveVoice !== 'undefined' && voiceReady) {
         try {
-            // Annuler toute parole en cours
-            responsiveVoice.cancel();
-            
-            // Liste des meilleures voix françaises disponibles
-            const voiceOptions = [
-                "French Male",           // Voix masculine française
-                "French Female",         // Voix féminine française
-                "French Canadian Male",  // Alternative
-                "French Canadian Female" // Alternative
-            ];
-            
-            // Paramètres optimisés
-            const parameters = {
-                pitch: 1,           // Ton normal
-                rate: 0.95,         // Vitesse (0.95 = légèrement plus lent pour clarté)
-                volume: 1,          // Volume maximum
-                onstart: function() {
-                    console.log("🔊 ResponsiveVoice: JARRiprovaPCContinuaVIS parle");
-document.getElementById('voiceStatus').innerHTML = '🔊 En cours...';
-},
-onend: function() {
-console.log("✅ ResponsiveVoice: Terminé");
-document.getElementById('voiceStatus').innerHTML = '🔊 Prête (ResponsiveVoice)';
-},
-onerror: function(error) {
-console.error("❌ ResponsiveVoice erreur:", error);
-document.getElementById('voiceStatus').innerHTML = '⚠️ Erreur';
-// Fallback vers l'API native
-fallbackToNativeVoice(text);
+            if (opts.interrupt) responsiveVoice.cancel();
+            responsiveVoice.speak(textChunk, "French Female", {
+                rate: 0.95,
+                pitch: 1,
+                volume: 1,
+                onstart: function() { document.getElementById('voiceStatus').innerHTML = '🔊 En cours...'; },
+                onend: function() { document.getElementById('voiceStatus').innerHTML = '🔊 Prête (ResponsiveVoice)'; },
+                onerror: function() { document.getElementById('voiceStatus').innerHTML = '⚠️ Erreur'; }
+            });
+            return;
+        } catch (e) {
+            console.warn('ResponsiveVoice speak error', e);
+        }
+    }
+    // fallback native
+    try {
+        if (!('speechSynthesis' in window)) return;
+        const u = new SpeechSynthesisUtterance(textChunk);
+        u.lang = 'fr-FR';
+        u.rate = 0.95;
+        u.pitch = 1.0;
+        const voices = window.speechSynthesis.getVoices();
+        const french = voices.find(v => v.lang && v.lang.startsWith && v.lang.startsWith('fr'));
+        if (french) u.voice = french;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+    } catch (err) {
+        console.warn('native speak error', err);
+    }
 }
-};
-        // Parler avec ResponsiveVoice
-        responsiveVoice.speak(text, voiceOptions[0], parameters);
+
+function speakJarvis(text) {
+    // full speech after generation (kept for compatibility)
+    if (typeof responsiveVoice !== 'undefined' && voiceReady) {
+        try { responsiveVoice.cancel(); } catch(e){}
+        try {
+            responsiveVoice.speak(text, "French Female", {rate:0.95, pitch:1, volume:1});
+            return;
+        } catch(e) { console.warn(e); }
+    }
+    if ('speechSynthesis' in window) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'fr-FR'; u.rate = 0.95; u.pitch = 1;
+        const voices = window.speechSynthesis.getVoices();
+        const french = voices.find(v => v.lang && v.lang.startsWith && v.lang.startsWith('fr'));
+        if (french) u.voice = french;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+    }
+}
+
+// =================== FONCTION TYPING ANIMATION + VOICE EN TEMPS RÉEL ===================
+// This implementation types the text char-by-char AND speaks small chunks in real-time
+function typeWriterWithVoice(text, element, options = {}) {
+    const charsPerChunk = options.charsPerChunk || 40; // speak every N chars or on punctuation
+    const speakOnPunctuation = options.speakOnPunctuation !== undefined ? options.speakOnPunctuation : true;
+    let index = 0;
+    let buffer = '';
+    element.classList.add('typing');
+
+    function shouldSpeakNow(ch) {
+        if (speakOnPunctuation && /[\.\!\?\,;:
+]/.test(ch)) return true;
+        if (buffer.length >= charsPerChunk) return true;
+        return false;
+    }
+
+    function type() {
+        if (index < text.length) {
+            const ch = text.charAt(index);
+            element.textContent += ch;
+            buffer += ch;
+            index++;
+            element.parentElement.parentElement.scrollTop = element.parentElement.parentElement.scrollHeight;
+
+            if (shouldSpeakNow(ch)) {
+                const chunk = buffer.trim();
+                if (chunk.length > 0) {
+                    // speak the chunk immediately, interrupt previous small chunk to keep sync
+                    speakJarvisTextImmediate(chunk, {interrupt: true});
+                }
+                buffer = '';
+            }
+
+            setTimeout(type, 18); // typing speed
+        } else {
+            // speak remaining buffer if any, but don't interrupt long full speech
+            if (buffer.trim().length > 0) {
+                speakJarvisTextImmediate(buffer.trim(), {interrupt: false});
+            }
+            element.classList.remove('typing');
+            // After finished typing, also trigger full speak (optional) after short delay
+            setTimeout(() => speakJarvis(text), 600);
+        }
+    }
+    type();
+}
+
+// =================== SPEECH-TO-TEXT (STT) - WEB SPEECH API ===================
+let recognition = null;
+let recognizing = false;
+const micBtn = document.getElementById('micBtn');
+const msgInput = document.getElementById('messageInput');
+
+function initSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if (!SpeechRecognition) {
+        if (micBtn) { micBtn.disabled = true; micBtn.title = 'Reconnaissance vocale non supportée'; }
+        console.warn('SpeechRecognition non supporté par ce navigateur.');
         return;
-        
-    } catch (error) {
-        console.warn("⚠️ ResponsiveVoice exception:", error);
     }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'fr-FR';
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    recognition.onstart = function() {
+        recognizing = true;
+        if (micBtn) { micBtn.classList.add('recording'); micBtn.textContent = '⏺️ Enregistrement...'; }
+        document.getElementById('voiceStatus').textContent = '🎙️ Écoute...';
+    };
+
+    recognition.onerror = function(event) {
+        console.error('SpeechRecognition error', event);
+        recognizing = false;
+        if (micBtn) { micBtn.classList.remove('recording'); micBtn.textContent = '🎤 Avvia'; }
+        document.getElementById('voiceStatus').textContent = '⚠️ Erreur STT';
+    };
+
+    recognition.onend = function() {
+        recognizing = false;
+        if (micBtn) { micBtn.classList.remove('recording'); micBtn.textContent = '🎤 Avvia'; }
+        document.getElementById('voiceStatus').textContent = voiceReady ? '🔊 Prête (ResponsiveVoice)' : '🔊 Native (fallback)';
+    };
+
+    let finalTranscript = '';
+    recognition.onresult = function(event) {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const res = event.results[i];
+            if (res.isFinal) {
+                finalTranscript += res[0].transcript + ' ';
+            } else {
+                interimTranscript += res[0].transcript;
+            }
+        }
+        msgInput.value = (finalTranscript + interimTranscript).trim();
+    };
 }
 
-// OPTION 2: Fallback vers l'API native du navigateur
-console.log("🔄 Utilisation de l'API native (fallback)");
-fallbackToNativeVoice(text);
+if (micBtn) {
+    initSpeechRecognition();
+    micBtn.addEventListener('click', () => {
+        if (isMobile && !voiceUnlocked) unlockVoice();
+        if (!recognition) return;
+        if (recognizing) {
+            recognition.stop();
+            recognizing = false;
+            micBtn.classList.remove('recording');
+            micBtn.textContent = '🎤 Avvia';
+        } else {
+            try {
+                recognition.start();
+            } catch (e) {
+                console.warn('recognition.start() exception', e);
+            }
+        }
+    });
 }
-// =================== FALLBACK API NATIVE ===================
-function fallbackToNativeVoice(text) {
-if (!('speechSynthesis' in window)) {
-console.warn("⚠️ Synthèse vocale non disponible");
-return;
-}
-window.speechSynthesis.cancel();
 
-setTimeout(() => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'fr-FR';
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    
-    const voices = window.speechSynthesis.getVoices();
-    const frenchVoice = voices.find(v => 
-        v.lang === 'fr-FR' || v.lang.startsWith('fr')
-    );
-    
-    if (frenchVoice) {
-        utterance.voice = frenchVoice;
-        console.log("🔊 Voix native:", frenchVoice.name);
-    }
-    
-    utterance.onstart = () => {
-        document.getElementById('voiceStatus').innerHTML = '🔊 En cours (native)...';
-    };
-    
-    utterance.onend = () => {
-        document.getElementById('voiceStatus').innerHTML = '🔊 Native (fallback)';
-    };
-    
-    window.speechSynthesis.speak(utterance);
-}, 100);
-}
-// =================== FONCTION TEST VOCAL ===================
-function testVoice() {
-// Sur mobile, cette interaction déverrouille la voix
-if (isMobile && !voiceUnlocked) {
-unlockVoice();
-setTimeout(() => {
-speakJarvis("Bonjour, je suis JARVIS AI, créé par Pepe Musafiri. J'ai maintenant accès à Google Search pour vous fournir des informations actuelles. La synthèse vocale fonctionne correctement.");
-}, 200);
-} else {
-speakJarvis("Bonjour, je suis JARVIS AI, créé par Pepe Musafiri. J'ai maintenant accès à Google Search pour vous fournir des informations actuelles. La synthèse vocale fonctionne correctement.");
-}
-}
-// =================== FONCTION TYPING ANIMATION ===================
-function typeWriter(text, element) {
-let index = 0;
-element.classList.add('typing');
-function type() {
-    if (index < text.length) {
-        element.textContent += text.charAt(index);
-        index++;
-        element.parentElement.parentElement.scrollTop = element.parentElement.parentElement.scrollHeight;
-        setTimeout(type, 20);
-    } else {
-        element.classList.remove('typing');
-        setTimeout(() => speakJarvis(text), 300);
-    }
-}
-type();
-}
 // =================== GESTION DU FORMULAIRE ===================
-document.getElementById('chatForm').addEventListener('submit', async (e) => {
-e.preventDefault();
-// DÉVERROUILLAGE VOCAL sur mobile au premier clic
-if (isMobile && !voiceUnlocked) {
-    unlockVoice();
-}
-
-const messageInput = document.getElementById('messageInput');
-const modelSelect = document.getElementById('modelSelect');
+const chatForm = document.getElementById('chatForm');
 const sendBtn = document.getElementById('sendBtn');
+const modelSelect = document.getElementById('modelSelect');
 const chatWindow = document.getElementById('chatWindow');
 
-const userMessage = messageInput.value.trim();
-const selectedModel = modelSelect.value;
+chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-if (!userMessage) return;
-
-// Désactiver le bouton pendant l'envoi
-sendBtn.disabled = true;
-sendBtn.textContent = '⏳ Envoi...';
-
-// Incrémenter le compteur
-messageCount++;
-document.getElementById('msgCount').textContent = messageCount;
-
-// Afficher le message utilisateur
-const userMsgDiv = document.createElement('div');
-userMsgDiv.className = 'msg-user';
-userMsgDiv.textContent = userMessage;
-chatWindow.appendChild(userMsgDiv);
-
-// Afficher "JARVIS réfléchit..."
-const thinkingDiv = document.createElement('div');
-thinkingDiv.className = 'msg-jarvis';
-thinkingDiv.innerHTML = '🤔 JARVIS analyse votre demande <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
-chatWindow.appendChild(thinkingDiv);
-
-// Scroll
-chatWindow.scrollTop = chatWindow.scrollHeight;
-
-// Mettre à jour le modèle affiché
-const modelNames = {
-    'c4ai': 'C4AI Aya Expanse 32B',
-    'cosmosrp': 'CosmosRP'
-};
-document.getElementById('currentModel').textContent = modelNames[selectedModel];
-
-// Vider l'input
-messageInput.value = '';
-
-try {
-    // Envoyer la requête AJAX
-    const formData = new FormData();
-    formData.append('message', userMessage);
-    formData.append('model', selectedModel);
-    formData.append('ajax', 'true');
-
-    const response = await fetch(window.location.href, {
-        method: 'POST',
-        body: formData
-    });
-
-    const data = await response.json();
-
-    // Supprimer "JARVIS réfléchit"
-    thinkingDiv.remove();
-
-    // Afficher la réponse avec effet typing
-    const jarvisMsgDiv = document.createElement('div');
-    jarvisMsgDiv.className = 'msg-jarvis';
-    
-    // Ajouter badge si recherche Google utilisée
-    if (data.searchUsed) {
-        searchCount++;
-        document.getElementById('searchCount').textContent = searchCount;
-        const badge = document.createElement('span');
-        badge.className = 'search-badge';
-        badge.textContent = '🌐 Google Search utilisé';
-        jarvisMsgDiv.appendChild(badge);
-        jarvisMsgDiv.appendChild(document.createElement('br'));
-    }
-    
-    const typingSpan = document.createElement('span');
-    jarvisMsgDiv.appendChild(typingSpan);
-    chatWindow.appendChild(jarvisMsgDiv);
-
-    // Debug si présent (masqué par défaut)
-    if (data.debug && !data.success) {
-        const debugDiv = document.createElement('details');
-        debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;margin-top:10px;';
-        debugDiv.innerHTML = `<summary>🔍 Debug Info</summary><pre>${data.debug}</pre>`;
-        chatWindow.appendChild(debugDiv);
+    if (isMobile && !voiceUnlocked) {
+        unlockVoice();
     }
 
-    // Animation typing
-    typeWriter(data.message, typingSpan);
+    const userMessage = msgInput.value.trim();
+    const selectedModel = modelSelect.value;
 
-    // Scroll final
+    if (!userMessage) return;
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = '⏳ Envoi...';
+
+    messageCount++;
+    document.getElementById('msgCount').textContent = messageCount;
+
+    const userMsgDiv = document.createElement('div');
+    userMsgDiv.className = 'msg-user';
+    userMsgDiv.textContent = userMessage;
+    chatWindow.appendChild(userMsgDiv);
+
+    const thinkingDiv = document.createElement('div');
+    thinkingDiv.className = 'msg-jarvis';
+    thinkingDiv.innerHTML = '🤔 JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+    chatWindow.appendChild(thinkingDiv);
+
     chatWindow.scrollTop = chatWindow.scrollHeight;
 
-} catch (error) {
-    thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
-    console.error('Erreur:', error);
-} finally {
-    // Réactiver le bouton
-    sendBtn.disabled = false;
-    sendBtn.textContent = '▶ Envoyer';
-    messageInput.focus();
-}
+    const modelNames = { 'c4ai': 'C4AI Aya Expanse 32B', 'cosmosrp': 'CosmosRP' };
+    document.getElementById('currentModel').textContent = modelNames[selectedModel];
+
+    // keep a local copy before clearing input
+    const pendingMessage = msgInput.value;
+    msgInput.value = '';
+
+    try {
+        const formData = new FormData();
+        formData.append('message', pendingMessage);
+        formData.append('model', selectedModel);
+        formData.append('ajax', 'true');
+
+        const response = await fetch('<?php echo $_SERVER['PHP_SELF']; ?>', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) throw new Error('HTTP error ' + response.status);
+        const data = await response.json();
+
+        thinkingDiv.remove();
+
+        const jarvisMsgDiv = document.createElement('div');
+        jarvisMsgDiv.className = 'msg-jarvis';
+        const typingSpan = document.createElement('span');
+        jarvisMsgDiv.appendChild(typingSpan);
+        chatWindow.appendChild(jarvisMsgDiv);
+
+        if (data.debug && !data.success) {
+            const debugDiv = document.createElement('details');
+            debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;margin-top:10px;';
+            debugDiv.innerHTML = `<summary>🔍 Debug Info</summary><pre>${data.debug}</pre>`;
+            chatWindow.appendChild(debugDiv);
+        }
+
+        // Use the enhanced typewriter with live voice
+        typeWriterWithVoice(data.message, typingSpan, {charsPerChunk: 45, speakOnPunctuation: true});
+
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    } catch (error) {
+        thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
+        console.error('Erreur:', error);
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = '▶ Envoyer';
+        msgInput.focus();
+    }
 });
+
 // =================== FOCUS AUTOMATIQUE ===================
-document.getElementById('messageInput').focus();
-console.log('🚀 JARVIS AI with Google Search - Created by Pepe Musafiri - Initialisé avec succès !');
-console.log('🤖 System: Intelligence artificielle multilingue et multi-domaines');
-console.log('🌐 Google Search: Activé pour informations actuelles jusqu'en 2025');
-console.log('🦾 Inspired by: JARVIS from Iron Man (Tony Stark)');
+try { document.getElementById('messageInput').focus(); } catch (e) {}
+
+console.log('🚀 JARVIS AI Initialisé avec succès ! (avec STT + voix en temps réel)');
+
 </script>
+
 </body>
 </html>
 
