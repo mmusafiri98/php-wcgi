@@ -579,51 +579,20 @@ body {
     animation: pulse 1s infinite;
 }
 
-/* =================== BROWSER CONTROL IFRAME =================== */
-#browserFrame {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: none;
-    z-index: 9999;
-    background: #fff;
+/* =================== BROWSER NOTIFICATION =================== */
+#browserNotification {
+    animation: slideInFromRight 0.5s ease;
 }
 
-#browserFrame.active {
-    display: block;
-}
-
-.browser-controls {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    z-index: 10000;
-    display: none;
-}
-
-.browser-controls.active {
-    display: flex;
-    gap: 10px;
-}
-
-.browser-btn {
-    background: rgba(0, 0, 0, 0.8);
-    border: 2px solid var(--accent);
-    color: var(--accent);
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.browser-btn:hover {
-    background: var(--accent);
-    color: #000;
-    transform: translateY(-2px);
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 /* =================== FORM ELEMENTS =================== */
@@ -858,13 +827,17 @@ body {
     </div>
 </div>
 
-<!-- ============= BROWSER CONTROL OVERLAY ============= -->
-<div class="browser-controls" id="browserControls">
-    <button class="browser-btn" onclick="closeBrowser()">❌ Fermer</button>
-    <button class="browser-btn" onclick="returnToJarvis()">🏠 Retour JARVIS</button>
+<!-- ============= BROWSER CONTROL NOTIFICATION ============= -->
+<div id="browserNotification" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 10000; background: rgba(0, 234, 255, 0.95); color: #000; padding: 20px; border-radius: 15px; box-shadow: 0 5px 30px rgba(0, 234, 255, 0.5); max-width: 350px; font-family: 'Orbitron', Arial;">
+    <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 10px;">
+        🌐 JARVIS - Contrôle Navigateur
+    </div>
+    <div id="browserNotificationText" style="margin-bottom: 15px; line-height: 1.5;">
+    </div>
+    <button onclick="closeBrowserNotification()" style="background: #000; color: var(--accent); border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; font-family: 'Orbitron', Arial;">
+        ✓ OK, Compris
+    </button>
 </div>
-
-<iframe id="browserFrame"></iframe>
 
 <!-- ============= RESPONSIVEVOICE LIBRARY ============= -->
 <script src="https://code.responsivevoice.org/responsivevoice.js?key=A0SDeHMK"></script>
@@ -1060,44 +1033,76 @@ function testVoice() {
 }
 
 // =================== CONTROLE NAVIGATEUR ===================
+let openedTab = null;
+
 function executeBrowserCommand(command) {
     if (!command) return;
     
     const action = command.action;
     const param = command.param;
     
-    const browserFrame = document.getElementById('browserFrame');
-    const browserControls = document.getElementById('browserControls');
-    
     if (action === 'OPEN') {
-        // Ouvrir une URL
-        browserFrame.src = param;
-        browserFrame.classList.add('active');
-        browserControls.classList.add('active');
-        document.getElementById('browserStatus').innerHTML = '🌐 Page ouverte';
+        // Ouvrir une URL dans un nouvel onglet
+        openedTab = window.open(param, '_blank');
+        
+        if (openedTab) {
+            showBrowserNotification(`✅ Page ouverte dans un nouvel onglet:<br><strong>${param}</strong>`);
+            document.getElementById('browserStatus').innerHTML = '🌐 Page ouverte';
+        } else {
+            showBrowserNotification(`⚠️ Impossible d'ouvrir la page. Vérifiez que les pop-ups ne sont pas bloqués.`);
+        }
         
     } else if (action === 'SEARCH') {
-        // Recherche Google
+        // Recherche Google dans un nouvel onglet
         const searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(param);
-        browserFrame.src = searchUrl;
-        browserFrame.classList.add('active');
-        browserControls.classList.add('active');
-        document.getElementById('browserStatus').innerHTML = '🔍 Recherche en cours';
+        openedTab = window.open(searchUrl, '_blank');
+        
+        if (openedTab) {
+            showBrowserNotification(`🔍 Recherche Google ouverte:<br><strong>${param}</strong>`);
+            document.getElementById('browserStatus').innerHTML = '🔍 Recherche en cours';
+        } else {
+            showBrowserNotification(`⚠️ Impossible d'ouvrir la recherche. Vérifiez que les pop-ups ne sont pas bloqués.`);
+        }
         
     } else if (action === 'CLOSE') {
-        // Fermer le navigateur
-        closeBrowser();
+        // Fermer l'onglet ouvert (si possible)
+        if (openedTab && !openedTab.closed) {
+            openedTab.close();
+            openedTab = null;
+            showBrowserNotification(`✅ Onglet fermé avec succès.`);
+            document.getElementById('browserStatus').innerHTML = '✅ Actif';
+        } else {
+            showBrowserNotification(`ℹ️ Aucun onglet JARVIS ouvert à fermer.<br><em>Note: Pour raisons de sécurité, je ne peux fermer que les onglets que j'ai ouverts.</em>`);
+        }
     }
 }
 
-function closeBrowser() {
-    const browserFrame = document.getElementById('browserFrame');
-    const browserControls = document.getElementById('browserControls');
+function showBrowserNotification(message) {
+    const notification = document.getElementById('browserNotification');
+    const notificationText = document.getElementById('browserNotificationText');
     
-    browserFrame.classList.remove('active');
-    browserControls.classList.remove('active');
-    browserFrame.src = '';
-    document.getElementById('browserStatus').innerHTML = '✅ Actif';
+    notificationText.innerHTML = message;
+    notification.style.display = 'block';
+    
+    // Auto-fermeture après 8 secondes
+    setTimeout(() => {
+        closeBrowserNotification();
+    }, 8000);
+}
+
+function closeBrowserNotification() {
+    const notification = document.getElementById('browserNotification');
+    notification.style.display = 'none';
+}
+
+// Fonction legacy conservée pour compatibilité
+function closeBrowser() {
+    if (openedTab && !openedTab.closed) {
+        openedTab.close();
+        openedTab = null;
+        document.getElementById('browserStatus').innerHTML = '✅ Actif';
+        speakJarvis("Onglet fermé.");
+    }
 }
 
 function returnToJarvis() {
