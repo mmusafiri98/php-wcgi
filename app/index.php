@@ -1,16 +1,17 @@
 <?php
 // =====================================================
-// JARVIS AI - VERSION COMPLETE ET OPTIMISÉE
-// Mobile First + Responsive + Voice + Animations
+// JARVIS AI - VERSION COMPLETE AVEC GOOGLE SEARCH
+// Mobile First + Responsive + Voice + Web Search
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
 // === GOOGLE SEARCH API CREDENTIALS ===
 define('GOOGLE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
 define('SEARCH_ENGINE_ID', '511c9c9b776d246e4');
 
-
+// === SYSTEM PROMPT JARVIS AVEC GOOGLE SEARCH ===
 $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent créé par Pepe Musafiri, un ingénieur en informatique passionné qui s'est inspiré du JARVIS de Tony Stark dans Iron Man.
 
 **TON IDENTITÉ:**
@@ -42,6 +43,44 @@ Ton but principal est d'aider les utilisateurs en leur fournissant des informati
 - Privilégie les sources fiables et récentes
 
 Souviens-toi: tu es JARVIS AI, l'assistant virtuel créé par Pepe Musafiri pour aider l'humanité, inspiré par l'IA légendaire de Tony Stark.";
+
+// === FONCTION DETECTION HEURE ===
+function wantsTime($message) {
+    $keywords = [
+        'heure', 'time', 'il est quelle heure', 'quelle heure',
+        'donne l\'heure', 'donner l\'heure', 'current time',
+        'what time', 'tell me the time', 'hora'
+    ];
+
+    $msg = mb_strtolower($message);
+
+    foreach ($keywords as $kw) {
+        if (strpos($msg, $kw) !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// === FONCTION DETECTION DATE ===
+function wantsDate($message) {
+    $keywords = [
+        'date', 'jour', 'quel jour', 'on est quel jour',
+        'c\'est quoi la date', 'aujourd\'hui', 'today',
+        'what day', 'date du jour', 'quelle date',
+        'nous sommes le', 'sommes nous'
+    ];
+
+    $msg = mb_strtolower($message);
+
+    foreach ($keywords as $kw) {
+        if (strpos($msg, $kw) !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // === FONCTION GOOGLE SEARCH ===
 function googleSearch($query, $numResults = 5) {
     $apiKey = GOOGLE_API_KEY;
@@ -89,6 +128,7 @@ function googleSearch($query, $numResults = 5) {
         'httpCode' => $httpCode
     ];
 }
+
 // === DÉTECTION SI RECHERCHE WEB NÉCESSAIRE ===
 function needsWebSearch($message) {
     $keywords = [
@@ -119,6 +159,36 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     $response = ["success" => false, "message" => "", "debug" => "", "searchUsed" => false];
 
     if ($userMessage !== "") {
+        
+        // Définir le fuseau horaire
+        date_default_timezone_set('Europe/Brussels'); // Belgique
+        
+        // Réponse si l'utilisateur demande l'heure
+        if (wantsTime($userMessage)) {
+            $heure = date("H:i:s");
+            echo json_encode([
+                "success" => true,
+                "message" => "⏰ Il est actuellement **$heure** (heure de Belgique).",
+                "searchUsed" => false
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        // Réponse si l'utilisateur demande la date
+        if (wantsDate($userMessage)) {
+            setlocale(LC_TIME, 'fr_FR.UTF-8', 'fra'); // Configurer la locale française
+            $date = date("d/m/Y");
+            $jourNum = date("w"); // 0 (dimanche) à 6 (samedi)
+            $jours = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            $jour = $jours[$jourNum];
+
+            echo json_encode([
+                "success" => true,
+                "message" => "📅 Nous sommes le **$jour $date**.",
+                "searchUsed" => false
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         
         // Vérifier si une recherche Google est nécessaire
         $searchResults = null;
@@ -236,6 +306,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     exit;
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
