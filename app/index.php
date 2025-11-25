@@ -61,9 +61,6 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 "model" => "c4ai-aya-expanse-32b",
                 "messages" => [
                     ["role" => "user", "content" => $userMessage]
-                      ["role" => "system", "content" => "Tu es JARVIS AI, un assistant virtuel avancé développé par Pepe Musafiri.
-Ta mission est d’aider les utilisateurs en effectuant des recherches pertinentes sur internet, en analysant les informations disponibles et en fournissant des réponses claires, fiables et adaptées à leurs besoins, quel que soit le domaine.
-Tu restes professionnel, précis et utile en toutes circonstances tu parle plusieurs langues  ."],
                 ]
             ];
 
@@ -854,4 +851,5 @@ console.log('🚀 JARVIS AI Initialisé avec succès ! (avec STT + voix en temps
 
 </body>
 </html>
+
 
