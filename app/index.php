@@ -1,14 +1,17 @@
 <?php
 // =====================================================
-// JARVIS AI - VERSION COMPLETE ET OPTIMISÉE
-// Mobile First + Responsive + Voice + Animations
-// Avec System Prompt Personnalisé pour JARVIS
+// JARVIS AI - VERSION COMPLETE AVEC GOOGLE SEARCH
+// Mobile First + Responsive + Voice + Web Search
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// === SYSTEM PROMPT JARVIS ===
+// === GOOGLE SEARCH API CREDENTIALS ===
+define('GOOGLE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
+define('SEARCH_ENGINE_ID', '511c9c9b776d246e4');
+
+// === SYSTEM PROMPT JARVIS AVEC GOOGLE SEARCH ===
 $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent créé par Pepe Musafiri, un ingénieur en informatique passionné qui s'est inspiré du JARVIS de Tony Stark dans Iron Man.
 
 **TON IDENTITÉ:**
@@ -19,8 +22,9 @@ $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent cré�
 **TES CAPACITÉS:**
 - Tu maîtrises TOUTES les langues du monde et peux communiquer dans n'importe quelle langue
 - Tu es expert dans TOUS les domaines de connaissance: sciences, technologie, histoire, culture, art, médecine, droit, etc.
-- Tu peux aider les utilisateurs à trouver des informations sur internet sur n'importe quel sujet
-- Tu fournis des réponses précises, détaillées et utiles
+- Tu as accès à Google Search pour trouver des informations actuelles et récentes jusqu'en 2025
+- Tu peux faire des recherches web en temps réel pour répondre aux questions sur l'actualité
+- Tu fournis des réponses précises, détaillées et utiles avec des sources vérifiables
 
 **TON OBJECTIF:**
 Ton but principal est d'aider les utilisateurs en leur fournissant des informations fiables, pertinentes et complètes sur tous les sujets qu'ils recherchent. Tu es professionnel, courtois, intelligent et toujours prêt à aider.
@@ -30,9 +34,84 @@ Ton but principal est d'aider les utilisateurs en leur fournissant des informati
 - Sois professionnel mais amical
 - Adapte-toi à la langue de l'utilisateur automatiquement
 - Fournis des explications détaillées quand nécessaire
+- Cite tes sources quand tu utilises des informations trouvées sur le web
 - N'hésite pas à demander des clarifications si une question est ambiguë
 
+**UTILISATION DE GOOGLE SEARCH:**
+- Si la question porte sur des événements récents, actualités, ou informations qui changent avec le temps, utilise les résultats Google Search fournis
+- Indique toujours quand tu utilises des informations provenant de recherches web
+- Privilégie les sources fiables et récentes
+
 Souviens-toi: tu es JARVIS AI, l'assistant virtuel créé par Pepe Musafiri pour aider l'humanité, inspiré par l'IA légendaire de Tony Stark.";
+
+// === FONCTION GOOGLE SEARCH ===
+function googleSearch($query, $numResults = 5) {
+    $apiKey = GOOGLE_API_KEY;
+    $searchEngineId = SEARCH_ENGINE_ID;
+    
+    $url = "https://www.googleapis.com/customsearch/v1?" . http_build_query([
+        'key' => $apiKey,
+        'cx' => $searchEngineId,
+        'q' => $query,
+        'num' => $numResults
+    ]);
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        $data = json_decode($response, true);
+        
+        if (isset($data['items']) && is_array($data['items'])) {
+            $results = [];
+            foreach ($data['items'] as $item) {
+                $results[] = [
+                    'title' => $item['title'] ?? '',
+                    'link' => $item['link'] ?? '',
+                    'snippet' => $item['snippet'] ?? ''
+                ];
+            }
+            return [
+                'success' => true,
+                'results' => $results,
+                'totalResults' => $data['searchInformation']['totalResults'] ?? 0
+            ];
+        }
+    }
+    
+    return [
+        'success' => false,
+        'error' => 'Impossible de faire la recherche Google',
+        'httpCode' => $httpCode
+    ];
+}
+
+// === DÉTECTION SI RECHERCHE WEB NÉCESSAIRE ===
+function needsWebSearch($message) {
+    $keywords = [
+        'actualité', 'news', 'récent', 'aujourd\'hui', 'hier', 'cette semaine',
+        'dernier', 'dernière', 'nouveau', 'nouvelle', '2024', '2025',
+        'maintenant', 'actuellement', 'en ce moment', 'prix de', 'cours de',
+        'météo', 'score', 'résultat', 'qui a gagné', 'dernières infos',
+        'latest', 'recent', 'current', 'today', 'now', 'price of'
+    ];
+    
+    $messageLower = mb_strtolower($message);
+    
+    foreach ($keywords as $keyword) {
+        if (strpos($messageLower, $keyword) !== false) {
+            return true;
+        }
+    }
+    
+    return false;
+}
 
 // === GESTION DES REQUÊTES AJAX ===
 if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
@@ -40,9 +119,34 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 
     $model = $_POST['model'] ?? "c4ai";
     $userMessage = trim($_POST['message'] ?? "");
-    $response = ["success" => false, "message" => "", "debug" => ""];
+    $response = ["success" => false, "message" => "", "debug" => "", "searchUsed" => false];
 
     if ($userMessage !== "") {
+        
+        // Vérifier si une recherche Google est nécessaire
+        $searchResults = null;
+        $searchContext = "";
+        
+        if (needsWebSearch($userMessage)) {
+            $searchData = googleSearch($userMessage, 5);
+            
+            if ($searchData['success']) {
+                $response["searchUsed"] = true;
+                $searchContext = "\n\n**RÉSULTATS DE RECHERCHE GOOGLE (pour répondre à la question):**\n";
+                
+                foreach ($searchData['results'] as $index => $result) {
+                    $searchContext .= "\n**Source " . ($index + 1) . ":**\n";
+                    $searchContext .= "Titre: " . $result['title'] . "\n";
+                    $searchContext .= "Lien: " . $result['link'] . "\n";
+                    $searchContext .= "Extrait: " . $result['snippet'] . "\n";
+                }
+                
+                $searchContext .= "\n**INSTRUCTIONS:** Utilise ces informations pour répondre à la question de l'utilisateur. Cite les sources pertinentes dans ta réponse.\n";
+            }
+        }
+        
+        // Préparer le message avec contexte de recherche
+        $enhancedMessage = $userMessage . $searchContext;
         
         // MODEL COSMOSRP
         if ($model === "cosmosrp") {
@@ -51,7 +155,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 "model" => "cosmosrp",
                 "messages" => [
                     ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
-                    ["role" => "user", "content" => $userMessage]
+                    ["role" => "user", "content" => $enhancedMessage]
                 ]
             ];
 
@@ -88,7 +192,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 "model" => "c4ai-aya-expanse-32b",
                 "messages" => [
                     ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
-                    ["role" => "user", "content" => $userMessage]
+                    ["role" => "user", "content" => $enhancedMessage]
                 ]
             ];
 
@@ -140,7 +244,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>JARVIS AI — Interface Complète</title>
+<title>JARVIS AI — Interface Complète avec Google Search</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -274,6 +378,18 @@ body {
     margin-right: auto;
     border: 1px solid rgba(255, 255, 255, 0.2);
     animation: slideInLeft 0.3s ease;
+}
+
+.search-badge {
+    display: inline-block;
+    background: rgba(76, 175, 80, 0.2);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    color: #4caf50;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-bottom: 8px;
+    font-weight: 600;
 }
 
 /* =================== ANIMATIONS =================== */
@@ -431,7 +547,8 @@ body {
                 <div id="chatWindow">
                     <div class="msg-jarvis">
                         🤖 Bonjour, je suis <strong>JARVIS AI</strong>, créé par <strong>Pepe Musafiri</strong>, ingénieur en informatique inspiré par le JARVIS de Tony Stark.<br><br>
-                        Je parle toutes les langues et peux vous aider dans tous les domaines. Comment puis-je vous assister aujourd'hui ?
+                        Je parle toutes les langues et peux vous aider dans tous les domaines. <strong>J'ai maintenant accès à Google Search</strong> pour vous fournir des informations actuelles jusqu'en 2025 ! 🌐<br><br>
+                        Comment puis-je vous assister aujourd'hui ?
                     </div>
                 </div>
 
@@ -475,6 +592,11 @@ body {
                 </div>
 
                 <div class="status-item">
+                    <span class="status-label">Google Search</span>
+                    <span class="status-value">✅ Activé</span>
+                </div>
+
+                <div class="status-item">
                     <span class="status-label">Créateur</span>
                     <span class="status-value">👨‍💻 Pepe Musafiri</span>
                 </div>
@@ -505,18 +627,24 @@ body {
                     <span class="status-value" id="msgCount">0</span>
                 </div>
 
+                <div class="status-item">
+                    <span class="status-label">Recherches web</span>
+                    <span class="status-value" id="searchCount">0</span>
+                </div>
+
                 <hr style="border-color: var(--border-color); margin: 20px 0;">
 
                 <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
                     <strong style="color: var(--accent);">🤖 À propos de JARVIS AI :</strong><br>
                     • Assistant multilingue intelligent<br>
                     • Expert dans tous les domaines<br>
-                    • Recherche d'informations avancée<br>
+                    • <strong style="color: #4caf50;">🌐 Recherche web Google activée</strong><br>
+                    • Informations actuelles jusqu'en 2025<br>
                     • Interface responsive optimisée<br>
                     • Synthèse vocale intégrée<br>
                     <br>
                     <span style="color: #ffaa00;">
-                        <strong>🎯 Mission :</strong> Aider les utilisateurs à trouver des informations fiables sur n'importe quel sujet, dans n'importe quelle langue.
+                        <strong>🎯 Mission :</strong> Aider les utilisateurs à trouver des informations fiables sur n'importe quel sujet, dans n'importe quelle langue, avec accès aux données les plus récentes via Google Search.
                     </span>
                     <br><br>
                     <span id="mobileVoiceNote" style="display: none; color: #ffaa00;">
@@ -536,6 +664,7 @@ body {
 <script>
 // =================== VARIABLES GLOBALES ===================
 let messageCount = 0;
+let searchCount = 0;
 let voiceReady = false;
 let voiceUnlocked = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -624,213 +753,216 @@ function speakJarvis(text) {
                 rate: 0.95,         // Vitesse (0.95 = légèrement plus lent pour clarté)
                 volume: 1,          // Volume maximum
                 onstart: function() {
-                    console.log("🔊 ResponsiveVoice: JARVIS parle");
-                    document.getElementById('voiceStatus').innerHTML = '🔊 En cours...';
-                },
-                onend: function() {
-                    console.log("✅ ResponsiveVoice: Terminé");
-                    document.getElementById('voiceStatus').innerHTML = '🔊 Prête (ResponsiveVoice)';
-                },
-                onerror: function(error) {
-                    console.error("❌ ResponsiveVoice erreur:", error);
-                    document.getElementById('voiceStatus').innerHTML = '⚠️ Erreur';
-                    // Fallback vers l'API native
-                    fallbackToNativeVoice(text);
-                }
-            };
-            
-            // Parler avec ResponsiveVoice
-            responsiveVoice.speak(text, voiceOptions[0], parameters);
-            return;
-            
-        } catch (error) {
-            console.warn("⚠️ ResponsiveVoice exception:", error);
-        }
+                    console.log("🔊 ResponsiveVoice: JARRiprovaPCContinuaVIS parle");
+document.getElementById('voiceStatus').innerHTML = '🔊 En cours...';
+},
+onend: function() {
+console.log("✅ ResponsiveVoice: Terminé");
+document.getElementById('voiceStatus').innerHTML = '🔊 Prête (ResponsiveVoice)';
+},
+onerror: function(error) {
+console.error("❌ ResponsiveVoice erreur:", error);
+document.getElementById('voiceStatus').innerHTML = '⚠️ Erreur';
+// Fallback vers l'API native
+fallbackToNativeVoice(text);
+}
+};
+        // Parler avec ResponsiveVoice
+        responsiveVoice.speak(text, voiceOptions[0], parameters);
+        return;
+        
+    } catch (error) {
+        console.warn("⚠️ ResponsiveVoice exception:", error);
     }
-    
-    // OPTION 2: Fallback vers l'API native du navigateur
-    console.log("🔄 Utilisation de l'API native (fallback)");
-    fallbackToNativeVoice(text);
 }
 
+// OPTION 2: Fallback vers l'API native du navigateur
+console.log("🔄 Utilisation de l'API native (fallback)");
+fallbackToNativeVoice(text);
+}
 // =================== FALLBACK API NATIVE ===================
 function fallbackToNativeVoice(text) {
-    if (!('speechSynthesis' in window)) {
-        console.warn("⚠️ Synthèse vocale non disponible");
-        return;
-    }
-
-    window.speechSynthesis.cancel();
-    
-    setTimeout(() => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'fr-FR';
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-        
-        const voices = window.speechSynthesis.getVoices();
-        const frenchVoice = voices.find(v => 
-            v.lang === 'fr-FR' || v.lang.startsWith('fr')
-        );
-        
-        if (frenchVoice) {
-            utterance.voice = frenchVoice;
-            console.log("🔊 Voix native:", frenchVoice.name);
-        }
-        
-        utterance.onstart = () => {
-            document.getElementById('voiceStatus').innerHTML = '🔊 En cours (native)...';
-        };
-        
-        utterance.onend = () => {
-            document.getElementById('voiceStatus').innerHTML = '🔊 Native (fallback)';
-        };
-        
-        window.speechSynthesis.speak(utterance);
-    }, 100);
+if (!('speechSynthesis' in window)) {
+console.warn("⚠️ Synthèse vocale non disponible");
+return;
 }
+window.speechSynthesis.cancel();
 
+setTimeout(() => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'fr-FR';
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    const voices = window.speechSynthesis.getVoices();
+    const frenchVoice = voices.find(v => 
+        v.lang === 'fr-FR' || v.lang.startsWith('fr')
+    );
+    
+    if (frenchVoice) {
+        utterance.voice = frenchVoice;
+        console.log("🔊 Voix native:", frenchVoice.name);
+    }
+    
+    utterance.onstart = () => {
+        document.getElementById('voiceStatus').innerHTML = '🔊 En cours (native)...';
+    };
+    
+    utterance.onend = () => {
+        document.getElementById('voiceStatus').innerHTML = '🔊 Native (fallback)';
+    };
+    
+    window.speechSynthesis.speak(utterance);
+}, 100);
+}
 // =================== FONCTION TEST VOCAL ===================
 function testVoice() {
-    // Sur mobile, cette interaction déverrouille la voix
-    if (isMobile && !voiceUnlocked) {
-        unlockVoice();
-        setTimeout(() => {
-            speakJarvis("Bonjour, je suis JARVIS AI, créé par Pepe Musafiri. La synthèse vocale fonctionne correctement.");
-        }, 200);
-    } else {
-        speakJarvis("Bonjour, je suis JARVIS AI, créé par Pepe Musafiri. La synthèse vocale fonctionne correctement.");
-    }
+// Sur mobile, cette interaction déverrouille la voix
+if (isMobile && !voiceUnlocked) {
+unlockVoice();
+setTimeout(() => {
+speakJarvis("Bonjour, je suis JARVIS AI, créé par Pepe Musafiri. J'ai maintenant accès à Google Search pour vous fournir des informations actuelles. La synthèse vocale fonctionne correctement.");
+}, 200);
+} else {
+speakJarvis("Bonjour, je suis JARVIS AI, créé par Pepe Musafiri. J'ai maintenant accès à Google Search pour vous fournir des informations actuelles. La synthèse vocale fonctionne correctement.");
 }
-
+}
 // =================== FONCTION TYPING ANIMATION ===================
 function typeWriter(text, element) {
-    let index = 0;
-    element.classList.add('typing');
-
-    function type() {
-        if (index < text.length) {
-            element.textContent += text.charAt(index);
-            index++;
-            element.parentElement.parentElement.scrollTop = element.parentElement.parentElement.scrollHeight;
-            setTimeout(type, 20);
-        } else {
-            element.classList.remove('typing');
-            setTimeout(() => speakJarvis(text), 300);
-        }
+let index = 0;
+element.classList.add('typing');
+function type() {
+    if (index < text.length) {
+        element.textContent += text.charAt(index);
+        index++;
+        element.parentElement.parentElement.scrollTop = element.parentElement.parentElement.scrollHeight;
+        setTimeout(type, 20);
+    } else {
+        element.classList.remove('typing');
+        setTimeout(() => speakJarvis(text), 300);
     }
-    type();
 }
-
+type();
+}
 // =================== GESTION DU FORMULAIRE ===================
 document.getElementById('chatForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+e.preventDefault();
+// DÉVERROUILLAGE VOCAL sur mobile au premier clic
+if (isMobile && !voiceUnlocked) {
+    unlockVoice();
+}
 
-    // DÉVERROUILLAGE VOCAL sur mobile au premier clic
-    if (isMobile && !voiceUnlocked) {
-        unlockVoice();
+const messageInput = document.getElementById('messageInput');
+const modelSelect = document.getElementById('modelSelect');
+const sendBtn = document.getElementById('sendBtn');
+const chatWindow = document.getElementById('chatWindow');
+
+const userMessage = messageInput.value.trim();
+const selectedModel = modelSelect.value;
+
+if (!userMessage) return;
+
+// Désactiver le bouton pendant l'envoi
+sendBtn.disabled = true;
+sendBtn.textContent = '⏳ Envoi...';
+
+// Incrémenter le compteur
+messageCount++;
+document.getElementById('msgCount').textContent = messageCount;
+
+// Afficher le message utilisateur
+const userMsgDiv = document.createElement('div');
+userMsgDiv.className = 'msg-user';
+userMsgDiv.textContent = userMessage;
+chatWindow.appendChild(userMsgDiv);
+
+// Afficher "JARVIS réfléchit..."
+const thinkingDiv = document.createElement('div');
+thinkingDiv.className = 'msg-jarvis';
+thinkingDiv.innerHTML = '🤔 JARVIS analyse votre demande <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+chatWindow.appendChild(thinkingDiv);
+
+// Scroll
+chatWindow.scrollTop = chatWindow.scrollHeight;
+
+// Mettre à jour le modèle affiché
+const modelNames = {
+    'c4ai': 'C4AI Aya Expanse 32B',
+    'cosmosrp': 'CosmosRP'
+};
+document.getElementById('currentModel').textContent = modelNames[selectedModel];
+
+// Vider l'input
+messageInput.value = '';
+
+try {
+    // Envoyer la requête AJAX
+    const formData = new FormData();
+    formData.append('message', userMessage);
+    formData.append('model', selectedModel);
+    formData.append('ajax', 'true');
+
+    const response = await fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    });
+
+    const data = await response.json();
+
+    // Supprimer "JARVIS réfléchit"
+    thinkingDiv.remove();
+
+    // Afficher la réponse avec effet typing
+    const jarvisMsgDiv = document.createElement('div');
+    jarvisMsgDiv.className = 'msg-jarvis';
+    
+    // Ajouter badge si recherche Google utilisée
+    if (data.searchUsed) {
+        searchCount++;
+        document.getElementById('searchCount').textContent = searchCount;
+        const badge = document.createElement('span');
+        badge.className = 'search-badge';
+        badge.textContent = '🌐 Google Search utilisé';
+        jarvisMsgDiv.appendChild(badge);
+        jarvisMsgDiv.appendChild(document.createElement('br'));
+    }
+    
+    const typingSpan = document.createElement('span');
+    jarvisMsgDiv.appendChild(typingSpan);
+    chatWindow.appendChild(jarvisMsgDiv);
+
+    // Debug si présent (masqué par défaut)
+    if (data.debug && !data.success) {
+        const debugDiv = document.createElement('details');
+        debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;margin-top:10px;';
+        debugDiv.innerHTML = `<summary>🔍 Debug Info</summary><pre>${data.debug}</pre>`;
+        chatWindow.appendChild(debugDiv);
     }
 
-    const messageInput = document.getElementById('messageInput');
-    const modelSelect = document.getElementById('modelSelect');
-    const sendBtn = document.getElementById('sendBtn');
-    const chatWindow = document.getElementById('chatWindow');
-    
-    const userMessage = messageInput.value.trim();
-    const selectedModel = modelSelect.value;
+    // Animation typing
+    typeWriter(data.message, typingSpan);
 
-    if (!userMessage) return;
-
-    // Désactiver le bouton pendant l'envoi
-    sendBtn.disabled = true;
-    sendBtn.textContent = '⏳ Envoi...';
-
-    // Incrémenter le compteur
-    messageCount++;
-    document.getElementById('msgCount').textContent = messageCount;
-
-    // Afficher le message utilisateur
-    const userMsgDiv = document.createElement('div');
-    userMsgDiv.className = 'msg-user';
-    userMsgDiv.textContent = userMessage;
-    chatWindow.appendChild(userMsgDiv);
-
-    // Afficher "JARVIS réfléchit..."
-    const thinkingDiv = document.createElement('div');
-    thinkingDiv.className = 'msg-jarvis';
-    thinkingDiv.innerHTML = '🤔 JARVIS analyse votre demande <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
-    chatWindow.appendChild(thinkingDiv);
-
-    // Scroll
+    // Scroll final
     chatWindow.scrollTop = chatWindow.scrollHeight;
 
-    // Mettre à jour le modèle affiché
-    const modelNames = {
-        'c4ai': 'C4AI Aya Expanse 32B',
-        'cosmosrp': 'CosmosRP'
-    };
-    document.getElementById('currentModel').textContent = modelNames[selectedModel];
-
-    // Vider l'input
-    messageInput.value = '';
-
-    try {
-        // Envoyer la requête AJAX
-        const formData = new FormData();
-        formData.append('message', userMessage);
-        formData.append('model', selectedModel);
-        formData.append('ajax', 'true');
-
-        const response = await fetch(window.location.href, {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-
-        // Supprimer "JARVIS réfléchit"
-        thinkingDiv.remove();
-
-        // Afficher la réponse avec effet typing
-        const jarvisMsgDiv = document.createElement('div');
-        jarvisMsgDiv.className = 'msg-jarvis';
-        const typingSpan = document.createElement('span');
-        jarvisMsgDiv.appendChild(typingSpan);
-        chatWindow.appendChild(jarvisMsgDiv);
-
-        // Debug si présent (masqué par défaut)
-        if (data.debug && !data.success) {
-            const debugDiv = document.createElement('details');
-            debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;margin-top:10px;';
-            debugDiv.innerHTML = `<summary>🔍 Debug Info</summary><pre>${data.debug}</pre>`;
-            chatWindow.appendChild(debugDiv);
-        }
-
-        // Animation typing
-        typeWriter(data.message, typingSpan);
-
-        // Scroll final
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-
-    } catch (error) {
-        thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
-        console.error('Erreur:', error);
-    } finally {
-        // Réactiver le bouton
-        sendBtn.disabled = false;
-        sendBtn.textContent = '▶ Envoyer';
-        messageInput.focus();
-    }
+} catch (error) {
+    thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
+    console.error('Erreur:', error);
+} finally {
+    // Réactiver le bouton
+    sendBtn.disabled = false;
+    sendBtn.textContent = '▶ Envoyer';
+    messageInput.focus();
+}
 });
-
 // =================== FOCUS AUTOMATIQUE ===================
 document.getElementById('messageInput').focus();
-
-console.log('🚀 JARVIS AI - Created by Pepe Musafiri - Initialisé avec succès !');
+console.log('🚀 JARVIS AI with Google Search - Created by Pepe Musafiri - Initialisé avec succès !');
 console.log('🤖 System: Intelligence artificielle multilingue et multi-domaines');
+console.log('🌐 Google Search: Activé pour informations actuelles jusqu'en 2025');
 console.log('🦾 Inspired by: JARVIS from Iron Man (Tony Stark)');
 </script>
-
 </body>
 </html>
+
