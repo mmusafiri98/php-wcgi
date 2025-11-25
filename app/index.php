@@ -6,6 +6,10 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+// === GOOGLE SEARCH API CREDENTIALS ===
+define('GOOGLE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
+define('SEARCH_ENGINE_ID', '511c9c9b776d246e4');
+
 
 $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent créé par Pepe Musafiri, un ingénieur en informatique passionné qui s'est inspiré du JARVIS de Tony Stark dans Iron Man.
 
@@ -38,6 +42,73 @@ Ton but principal est d'aider les utilisateurs en leur fournissant des informati
 - Privilégie les sources fiables et récentes
 
 Souviens-toi: tu es JARVIS AI, l'assistant virtuel créé par Pepe Musafiri pour aider l'humanité, inspiré par l'IA légendaire de Tony Stark.";
+// === FONCTION GOOGLE SEARCH ===
+function googleSearch($query, $numResults = 5) {
+    $apiKey = GOOGLE_API_KEY;
+    $searchEngineId = SEARCH_ENGINE_ID;
+    
+    $url = "https://www.googleapis.com/customsearch/v1?" . http_build_query([
+        'key' => $apiKey,
+        'cx' => $searchEngineId,
+        'q' => $query,
+        'num' => $numResults
+    ]);
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        $data = json_decode($response, true);
+        
+        if (isset($data['items']) && is_array($data['items'])) {
+            $results = [];
+            foreach ($data['items'] as $item) {
+                $results[] = [
+                    'title' => $item['title'] ?? '',
+                    'link' => $item['link'] ?? '',
+                    'snippet' => $item['snippet'] ?? ''
+                ];
+            }
+            return [
+                'success' => true,
+                'results' => $results,
+                'totalResults' => $data['searchInformation']['totalResults'] ?? 0
+            ];
+        }
+    }
+    
+    return [
+        'success' => false,
+        'error' => 'Impossible de faire la recherche Google',
+        'httpCode' => $httpCode
+    ];
+}
+// === DÉTECTION SI RECHERCHE WEB NÉCESSAIRE ===
+function needsWebSearch($message) {
+    $keywords = [
+        'actualité', 'news', 'récent', 'aujourd\'hui', 'hier', 'cette semaine',
+        'dernier', 'dernière', 'nouveau', 'nouvelle', '2024', '2025',
+        'maintenant', 'actuellement', 'en ce moment', 'prix de', 'cours de',
+        'météo', 'score', 'résultat', 'qui a gagné', 'dernières infos',
+        'latest', 'recent', 'current', 'today', 'now', 'price of'
+    ];
+    
+    $messageLower = mb_strtolower($message);
+    
+    foreach ($keywords as $keyword) {
+        if (strpos($messageLower, $keyword) !== false) {
+            return true;
+        }
+    }
+    
+    return false;
+}
 
 // === GESTION DES REQUÊTES AJAX ===
 if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
@@ -45,9 +116,34 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 
     $model = $_POST['model'] ?? "c4ai";
     $userMessage = trim($_POST['message'] ?? "");
-    $response = ["success" => false, "message" => "", "debug" => ""];
+    $response = ["success" => false, "message" => "", "debug" => "", "searchUsed" => false];
 
     if ($userMessage !== "") {
+        
+        // Vérifier si une recherche Google est nécessaire
+        $searchResults = null;
+        $searchContext = "";
+        
+        if (needsWebSearch($userMessage)) {
+            $searchData = googleSearch($userMessage, 5);
+            
+            if ($searchData['success']) {
+                $response["searchUsed"] = true;
+                $searchContext = "\n\n**RÉSULTATS DE RECHERCHE GOOGLE (pour répondre à la question):**\n";
+                
+                foreach ($searchData['results'] as $index => $result) {
+                    $searchContext .= "\n**Source " . ($index + 1) . ":**\n";
+                    $searchContext .= "Titre: " . $result['title'] . "\n";
+                    $searchContext .= "Lien: " . $result['link'] . "\n";
+                    $searchContext .= "Extrait: " . $result['snippet'] . "\n";
+                }
+                
+                $searchContext .= "\n**INSTRUCTIONS:** Utilise ces informations pour répondre à la question de l'utilisateur. Cite les sources pertinentes dans ta réponse.\n";
+            }
+        }
+        
+        // Préparer le message avec contexte de recherche
+        $enhancedMessage = $userMessage . $searchContext;
         
         // MODEL COSMOSRP
         if ($model === "cosmosrp") {
@@ -56,7 +152,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 "model" => "cosmosrp",
                 "messages" => [
                     ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
-                    ["role" => "user", "content" => $userMessage]
+                    ["role" => "user", "content" => $enhancedMessage]
                 ]
             ];
 
@@ -92,8 +188,8 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             $payload = [
                 "model" => "c4ai-aya-expanse-32b",
                 "messages" => [
-		    ["role" => "system", "content" =>$JARVIS_SYSTEM_PROMPT],
-                    ["role" => "user", "content" => $userMessage]
+                    ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
+                    ["role" => "user", "content" => $enhancedMessage]
                 ]
             ];
 
