@@ -817,6 +817,10 @@ body {
                     • Contrôle du navigateur<br>
                     • Recherche Google intégrée<br>
                     <br>
+                    <strong style="color: #ffaa00;">💡 Pour revenir à JARVIS :</strong><br>
+                    • Cliquez sur l'onglet JARVIS dans votre navigateur<br>
+                    • Ou fermez l'onglet ouvert et revenez ici<br>
+                    <br>
                     <span id="mobileVoiceNote" style="display: none; color: #ffaa00;">
                         📱 <strong>Sur mobile:</strong> Activez les permissions microphone.
                     </span>
@@ -836,6 +840,13 @@ body {
     </div>
     <button onclick="closeBrowserNotification()" style="background: #000; color: var(--accent); border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; font-family: 'Orbitron', Arial;">
         ✓ OK, Compris
+    </button>
+</div>
+
+<!-- ============= RETURN TO JARVIS BUTTON (FLOATING) ============= -->
+<div id="returnToJarvisBtn" style="display: none; position: fixed; bottom: 30px; right: 30px; z-index: 10001;">
+    <button onclick="focusJarvisTab()" style="background: linear-gradient(135deg, #00eaff, #0088cc); border: none; color: #000; font-weight: 700; padding: 15px 30px; border-radius: 50px; cursor: pointer; font-family: 'Orbitron', Arial; font-size: 1rem; box-shadow: 0 5px 25px rgba(0, 234, 255, 0.6); transition: all 0.3s ease;">
+        🏠 Retour à JARVIS
     </button>
 </div>
 
@@ -1034,6 +1045,10 @@ function testVoice() {
 
 // =================== CONTROLE NAVIGATEUR ===================
 let openedTab = null;
+let jarvisTabName = 'JARVIS_AI_MAIN_TAB';
+
+// Marquer cet onglet comme l'onglet JARVIS principal
+window.name = jarvisTabName;
 
 function executeBrowserCommand(command) {
     if (!command) return;
@@ -1046,8 +1061,11 @@ function executeBrowserCommand(command) {
         openedTab = window.open(param, '_blank');
         
         if (openedTab) {
-            showBrowserNotification(`✅ Page ouverte dans un nouvel onglet:<br><strong>${param}</strong>`);
+            showBrowserNotification(`✅ Page ouverte dans un nouvel onglet:<br><strong>${param}</strong><br><br>💡 <em>Pour revenir à JARVIS, cliquez sur l'onglet JARVIS dans votre navigateur ou utilisez Alt+Tab (PC) / Cmd+Tab (Mac)</em>`);
             document.getElementById('browserStatus').innerHTML = '🌐 Page ouverte';
+            
+            // Afficher le bouton de retour sur cette page
+            showReturnButton();
         } else {
             showBrowserNotification(`⚠️ Impossible d'ouvrir la page. Vérifiez que les pop-ups ne sont pas bloqués.`);
         }
@@ -1058,8 +1076,11 @@ function executeBrowserCommand(command) {
         openedTab = window.open(searchUrl, '_blank');
         
         if (openedTab) {
-            showBrowserNotification(`🔍 Recherche Google ouverte:<br><strong>${param}</strong>`);
+            showBrowserNotification(`🔍 Recherche Google ouverte:<br><strong>${param}</strong><br><br>💡 <em>Pour revenir à JARVIS, cliquez sur l'onglet JARVIS dans votre navigateur</em>`);
             document.getElementById('browserStatus').innerHTML = '🔍 Recherche en cours';
+            
+            // Afficher le bouton de retour sur cette page
+            showReturnButton();
         } else {
             showBrowserNotification(`⚠️ Impossible d'ouvrir la recherche. Vérifiez que les pop-ups ne sont pas bloqués.`);
         }
@@ -1071,10 +1092,32 @@ function executeBrowserCommand(command) {
             openedTab = null;
             showBrowserNotification(`✅ Onglet fermé avec succès.`);
             document.getElementById('browserStatus').innerHTML = '✅ Actif';
+            hideReturnButton();
         } else {
             showBrowserNotification(`ℹ️ Aucun onglet JARVIS ouvert à fermer.<br><em>Note: Pour raisons de sécurité, je ne peux fermer que les onglets que j'ai ouverts.</em>`);
         }
     }
+}
+
+function showReturnButton() {
+    const btn = document.getElementById('returnToJarvisBtn');
+    btn.style.display = 'block';
+    
+    // Masquer après 10 secondes
+    setTimeout(() => {
+        btn.style.display = 'none';
+    }, 10000);
+}
+
+function hideReturnButton() {
+    document.getElementById('returnToJarvisBtn').style.display = 'none';
+}
+
+function focusJarvisTab() {
+    // Cette fonction permet de refocaliser l'onglet JARVIS
+    window.focus();
+    hideReturnButton();
+    speakJarvis("Me revoilà ! Comment puis-je vous aider ?");
 }
 
 function showBrowserNotification(message) {
@@ -1084,10 +1127,10 @@ function showBrowserNotification(message) {
     notificationText.innerHTML = message;
     notification.style.display = 'block';
     
-    // Auto-fermeture après 8 secondes
+    // Auto-fermeture après 12 secondes (plus long pour lire le message)
     setTimeout(() => {
         closeBrowserNotification();
-    }, 8000);
+    }, 12000);
 }
 
 function closeBrowserNotification() {
@@ -1102,6 +1145,7 @@ function closeBrowser() {
         openedTab = null;
         document.getElementById('browserStatus').innerHTML = '✅ Actif';
         speakJarvis("Onglet fermé.");
+        hideReturnButton();
     }
 }
 
@@ -1109,6 +1153,20 @@ function returnToJarvis() {
     closeBrowser();
     speakJarvis("Je suis de retour. Comment puis-je vous aider ?");
 }
+
+// Détecter quand l'utilisateur revient sur l'onglet JARVIS
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        // L'utilisateur est revenu sur l'onglet JARVIS
+        hideReturnButton();
+        
+        // Vérifier si l'onglet ouvert est toujours actif
+        if (openedTab && openedTab.closed) {
+            openedTab = null;
+            document.getElementById('browserStatus').innerHTML = '✅ Actif';
+        }
+    }
+});
 
 // =================== FONCTION TYPING ANIMATION ===================
 function typeWriter(text, element) {
