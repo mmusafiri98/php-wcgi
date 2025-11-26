@@ -1,7 +1,7 @@
 <?php
 // =====================================================
-// JARVIS AI - VERSION COMPLETE AVEC GOOGLE SEARCH
-// Mobile First + Responsive + Voice + Web Search
+// JARVIS AI - VERSION COMPLETE AVEC GOOGLE SEARCH + RECONNAISSANCE VOCALE + CONTROLE NAVIGATEUR
+// Mobile First + Responsive + Voice + Web Search + Browser Control
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -11,7 +11,7 @@ error_reporting(E_ALL);
 define('GOOGLE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
 define('SEARCH_ENGINE_ID', '511c9c9b776d246e4');
 
-// === SYSTEM PROMPT JARVIS AVEC GOOGLE SEARCH ===
+// === SYSTEM PROMPT JARVIS AVEC GOOGLE SEARCH ET CONTROLE NAVIGATEUR ===
 $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent créé par Pepe Musafiri, un ingénieur en informatique passionné qui s'est inspiré du JARVIS de Tony Stark dans Iron Man.
 
 **TON IDENTITÉ:**
@@ -24,7 +24,31 @@ $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent cré�
 - Tu es expert dans TOUS les domaines de connaissance: sciences, technologie, histoire, culture, art, médecine, droit, etc.
 - Tu as accès à Google Search pour trouver des informations actuelles et récentes jusqu'en 2025
 - Tu peux faire des recherches web en temps réel pour répondre aux questions sur l'actualité
+- Tu peux contrôler le navigateur pour ouvrir des pages web, analyser leur contenu et revenir à l'interface
 - Tu fournis des réponses précises, détaillées et utiles avec des sources vérifiables
+
+**COMMANDES DE CONTROLE NAVIGATEUR:**
+Quand l'utilisateur te demande d'ouvrir un site web ou de chercher quelque chose, tu dois répondre avec une commande spéciale:
+
+Format: [BROWSER:ACTION:URL_OR_QUERY]
+
+Actions disponibles:
+- OPEN: Ouvrir une URL spécifique
+  Exemple: [BROWSER:OPEN:https://www.wikipedia.org]
+- SEARCH: Faire une recherche Google et ouvrir le premier résultat
+  Exemple: [BROWSER:SEARCH:recettes de pizza italienne]
+- CLOSE: Fermer l'onglet et revenir à JARVIS
+  Exemple: [BROWSER:CLOSE:]
+
+**EXEMPLES D'UTILISATION:**
+- Utilisateur: \"Ouvre YouTube\"
+  Réponse: \"D'accord, j'ouvre YouTube pour vous. [BROWSER:OPEN:https://www.youtube.com]\"
+
+- Utilisateur: \"Cherche des informations sur l'intelligence artificielle\"
+  Réponse: \"Je recherche des informations sur l'intelligence artificielle. [BROWSER:SEARCH:intelligence artificielle]\"
+
+- Utilisateur: \"Ferme la page\"
+  Réponse: \"Je ferme la page et reviens à l'interface JARVIS. [BROWSER:CLOSE:]\"
 
 **TON OBJECTIF:**
 Ton but principal est d'aider les utilisateurs en leur fournissant des informations fiables, pertinentes et complètes sur tous les sujets qu'ils recherchent. Tu es professionnel, courtois, intelligent et toujours prêt à aider.
@@ -36,11 +60,6 @@ Ton but principal est d'aider les utilisateurs en leur fournissant des informati
 - Fournis des explications détaillées quand nécessaire
 - Cite tes sources quand tu utilises des informations trouvées sur le web
 - N'hésite pas à demander des clarifications si une question est ambiguë
-
-**UTILISATION DE GOOGLE SEARCH:**
-- Si la question porte sur des événements récents, actualités, ou informations qui changent avec le temps, utilise les résultats Google Search fournis
-- Indique toujours quand tu utilises des informations provenant de recherches web
-- Privilégie les sources fiables et récentes
 
 Souviens-toi: tu es JARVIS AI, l'assistant virtuel créé par Pepe Musafiri pour aider l'humanité, inspiré par l'IA légendaire de Tony Stark.";
 
@@ -156,7 +175,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 
     $model = $_POST['model'] ?? "c4ai";
     $userMessage = trim($_POST['message'] ?? "");
-    $response = ["success" => false, "message" => "", "debug" => "", "searchUsed" => false];
+    $response = ["success" => false, "message" => "", "debug" => "", "searchUsed" => false, "browserCommand" => null];
 
     if ($userMessage !== "") {
         
@@ -169,23 +188,25 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             echo json_encode([
                 "success" => true,
                 "message" => "⏰ Il est actuellement **$heure** (heure de Belgique).",
-                "searchUsed" => false
+                "searchUsed" => false,
+                "browserCommand" => null
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
         // Réponse si l'utilisateur demande la date
         if (wantsDate($userMessage)) {
-            setlocale(LC_TIME, 'fr_FR.UTF-8', 'fra'); // Configurer la locale française
+            setlocale(LC_TIME, 'fr_FR.UTF-8', 'fra');
             $date = date("d/m/Y");
-            $jourNum = date("w"); // 0 (dimanche) à 6 (samedi)
+            $jourNum = date("w");
             $jours = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
             $jour = $jours[$jourNum];
 
             echo json_encode([
                 "success" => true,
                 "message" => "📅 Nous sommes le **$jour $date**.",
-                "searchUsed" => false
+                "searchUsed" => false,
+                "browserCommand" => null
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -245,6 +266,14 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 if (isset($data["choices"][0]["message"]["content"])) {
                     $response["message"] = $data["choices"][0]["message"]["content"];
                     $response["success"] = true;
+                    
+                    // Détecter les commandes navigateur
+                    if (preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $matches)) {
+                        $response["browserCommand"] = [
+                            "action" => $matches[1],
+                            "param" => $matches[2]
+                        ];
+                    }
                 } else {
                     $response["message"] = "❌ Pas de réponse de CosmosRP (HTTP $httpCode)";
                     $response["debug"] = $raw;
@@ -286,9 +315,25 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 if (isset($data["message"]["content"][0]["text"])) {
                     $response["message"] = $data["message"]["content"][0]["text"];
                     $response["success"] = true;
+                    
+                    // Détecter les commandes navigateur
+                    if (preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $matches)) {
+                        $response["browserCommand"] = [
+                            "action" => $matches[1],
+                            "param" => $matches[2]
+                        ];
+                    }
                 } elseif (isset($data["text"])) {
                     $response["message"] = $data["text"];
                     $response["success"] = true;
+                    
+                    // Détecter les commandes navigateur
+                    if (preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $matches)) {
+                        $response["browserCommand"] = [
+                            "action" => $matches[1],
+                            "param" => $matches[2]
+                        ];
+                    }
                 } elseif (isset($data["error"])) {
                     $response["message"] = "❌ Erreur API : " . json_encode($data["error"]);
                     $response["debug"] = $raw;
@@ -312,7 +357,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>JARVIS AI — Interface Complète</title>
+<title>JARVIS AI — Interface Complète + Contrôle Vocal</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -324,6 +369,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     --bg-dark: #020610;
     --panel-bg: rgba(0, 255, 255, 0.06);
     --border-color: rgba(0, 255, 255, 0.15);
+    --red-glow: #ff0040;
 }
 
 /* =================== BASE =================== */
@@ -464,6 +510,11 @@ body {
     50% { opacity: 1; }
 }
 
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
 .typing {
     border-right: 3px solid var(--accent);
     animation: blink 1s infinite;
@@ -479,6 +530,69 @@ body {
 
 .dots span:nth-child(3) {
     animation-delay: 0.6s;
+}
+
+/* =================== VOICE BUTTON =================== */
+.voice-btn {
+    background: linear-gradient(135deg, var(--red-glow), #cc0033);
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    padding: 15px;
+    border-radius: 50%;
+    width: 70px;
+    height: 70px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 5px 20px rgba(255, 0, 64, 0.4);
+    position: relative;
+}
+
+.voice-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(255, 0, 64, 0.6);
+}
+
+.voice-btn:active {
+    transform: translateY(0);
+}
+
+.voice-btn.listening {
+    animation: pulse 1s infinite;
+    background: linear-gradient(135deg, #ff0040, #ff3366);
+    box-shadow: 0 0 30px rgba(255, 0, 64, 0.8);
+}
+
+.voice-btn.listening::after {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    right: -5px;
+    bottom: -5px;
+    border-radius: 50%;
+    border: 2px solid var(--red-glow);
+    animation: pulse 1s infinite;
+}
+
+/* =================== BROWSER NOTIFICATION =================== */
+#browserNotification {
+    animation: slideInFromRight 0.5s ease;
+}
+
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 /* =================== FORM ELEMENTS =================== */
@@ -575,6 +689,12 @@ body {
     .panel-header {
         font-size: 1.2rem;
     }
+    
+    .voice-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5rem;
+    }
 }
 
 /* =================== LOADING STATE =================== */
@@ -618,14 +738,19 @@ body {
                         >
                     </div>
 
-                    <div class="row g-2">
-                        <div class="col-12 col-sm-7">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-sm-7 col-md-5">
                             <select id="modelSelect" class="form-select">
                                 <option value="c4ai">🤖 C4AI Aya Expanse 32B</option>
                                 <option value="cosmosrp">🌌 CosmosRP</option>
                             </select>
                         </div>
-                        <div class="col-12 col-sm-5">
+                        <div class="col-auto">
+                            <button type="button" id="voiceBtn" class="voice-btn" title="Reconnaissance vocale">
+                                🎤
+                            </button>
+                        </div>
+                        <div class="col">
                             <button type="submit" id="sendBtn" class="btn btn-send w-100">
                                 ▶ Envoyer
                             </button>
@@ -656,6 +781,16 @@ body {
                 </div>
 
                 <div class="status-item">
+                    <span class="status-label">Reconnaissance vocale</span>
+                    <span class="status-value" id="speechStatus">🔄 Vérification...</span>
+                </div>
+
+                <div class="status-item">
+                    <span class="status-label">Contrôle navigateur</span>
+                    <span class="status-value" id="browserStatus">✅ Actif</span>
+                </div>
+
+                <div class="status-item">
                     <button onclick="testVoice()" class="btn btn-sm" style="background: rgba(0,234,255,0.2); border: 1px solid var(--accent); color: var(--accent); padding: 5px 15px; border-radius: 8px; font-size: 0.85rem; width: 100%;">
                         🔊 Tester la voix
                     </button>
@@ -669,20 +804,50 @@ body {
                 <hr style="border-color: var(--border-color); margin: 20px 0;">
 
                 <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
-                    <strong style="color: var(--accent);">ℹ️ Informations :</strong><br>
-                    • Interface responsive optimisée<br>
+                    <strong style="color: var(--accent);">ℹ️ Commandes Vocales :</strong><br>
+                    • "Ouvre YouTube / Google / Wikipedia"<br>
+                    • "Cherche [sujet]"<br>
+                    • "Ferme la page"<br>
+                    • "Quelle heure est-il ?"<br>
+                    <br>
+                    <strong style="color: var(--accent);">🎯 Fonctionnalités :</strong><br>
+                    • Interface responsive<br>
                     • Synthèse vocale intégrée<br>
-                    • Animation typing en temps réel<br>
-                    • Support mobile & desktop<br>
+                    • Reconnaissance vocale<br>
+                    • Contrôle du navigateur<br>
+                    • Recherche Google intégrée<br>
+                    <br>
+                    <strong style="color: #ffaa00;">💡 Pour revenir à JARVIS :</strong><br>
+                    • Cliquez sur l'onglet JARVIS dans votre navigateur<br>
+                    • Ou fermez l'onglet ouvert et revenez ici<br>
                     <br>
                     <span id="mobileVoiceNote" style="display: none; color: #ffaa00;">
-                        📱 <strong>Sur mobile:</strong> Cliquez sur "Tester la voix" ou envoyez un message pour activer le son.
+                        📱 <strong>Sur mobile:</strong> Activez les permissions microphone.
                     </span>
                 </div>
             </div>
         </div>
 
     </div>
+</div>
+
+<!-- ============= BROWSER CONTROL NOTIFICATION ============= -->
+<div id="browserNotification" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 10000; background: rgba(0, 234, 255, 0.95); color: #000; padding: 20px; border-radius: 15px; box-shadow: 0 5px 30px rgba(0, 234, 255, 0.5); max-width: 350px; font-family: 'Orbitron', Arial;">
+    <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 10px;">
+        🌐 JARVIS - Contrôle Navigateur
+    </div>
+    <div id="browserNotificationText" style="margin-bottom: 15px; line-height: 1.5;">
+    </div>
+    <button onclick="closeBrowserNotification()" style="background: #000; color: var(--accent); border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; font-family: 'Orbitron', Arial;">
+        ✓ OK, Compris
+    </button>
+</div>
+
+<!-- ============= RETURN TO JARVIS BUTTON (FLOATING) ============= -->
+<div id="returnToJarvisBtn" style="display: none; position: fixed; bottom: 30px; right: 30px; z-index: 10001;">
+    <button onclick="focusJarvisTab()" style="background: linear-gradient(135deg, #00eaff, #0088cc); border: none; color: #000; font-weight: 700; padding: 15px 30px; border-radius: 50px; cursor: pointer; font-family: 'Orbitron', Arial; font-size: 1rem; box-shadow: 0 5px 25px rgba(0, 234, 255, 0.6); transition: all 0.3s ease;">
+        🏠 Retour à JARVIS
+    </button>
 </div>
 
 <!-- ============= RESPONSIVEVOICE LIBRARY ============= -->
@@ -694,15 +859,93 @@ body {
 let messageCount = 0;
 let voiceReady = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+let recognition = null;
+let isListening = false;
+
+// =================== DETECTION SUPPORT RECONNAISSANCE VOCALE ===================
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    
+    recognition.lang = 'fr-FR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    
+    document.getElementById('speechStatus').innerHTML = '✅ Disponible';
+    
+    // EVENT: Résultat de la reconnaissance
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        console.log('🎤 Commande vocale:', transcript);
+        
+        // Afficher dans l'input
+        document.getElementById('messageInput').value = transcript;
+        
+        // Envoyer automatiquement
+        setTimeout(() => {
+            document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+        }, 500);
+    };
+    
+    // EVENT: Fin de l'écoute
+    recognition.onend = function() {
+        isListening = false;
+        document.getElementById('voiceBtn').classList.remove('listening');
+        console.log('🎤 Reconnaissance vocale arrêtée');
+    };
+    
+    // EVENT: Erreur
+    recognition.onerror = function(event) {
+        console.error('❌ Erreur reconnaissance vocale:', event.error);
+        isListening = false;
+        document.getElementById('voiceBtn').classList.remove('listening');
+        
+        if (event.error === 'not-allowed') {
+            alert('🎤 Permission microphone refusée. Veuillez autoriser l\'accès au microphone.');
+        }
+    };
+    
+} else {
+    document.getElementById('speechStatus').innerHTML = '❌ Non supporté';
+    document.getElementById('voiceBtn').disabled = true;
+    document.getElementById('voiceBtn').title = 'Reconnaissance vocale non supportée par ce navigateur';
+}
+
+// =================== BOUTON RECONNAISSANCE VOCALE ===================
+document.getElementById('voiceBtn').addEventListener('click', function() {
+    if (!recognition) {
+        alert('❌ Reconnaissance vocale non supportée par votre navigateur.');
+        return;
+    }
+    
+    if (isListening) {
+        // Arrêter l'écoute
+        recognition.stop();
+        isListening = false;
+        this.classList.remove('listening');
+    } else {
+        // Démarrer l'écoute
+        try {
+            recognition.start();
+            isListening = true;
+            this.classList.add('listening');
+            console.log('🎤 Reconnaissance vocale démarrée...');
+            
+            // Feedback vocal
+            speakJarvis("Je vous écoute.");
+        } catch (error) {
+            console.error('❌ Erreur démarrage reconnaissance:', error);
+        }
+    }
+});
 
 // =================== INITIALISATION RESPONSIVEVOICE ===================
 window.addEventListener('load', function() {
-    // Attendre que ResponsiveVoice soit chargé
     const checkRV = setInterval(() => {
         if (typeof responsiveVoice !== 'undefined') {
             clearInterval(checkRV);
             
-            // Callback quand les voix sont prêtes
             responsiveVoice.OnVoiceReady = function() {
                 voiceReady = true;
                 const voices = responsiveVoice.getVoices();
@@ -711,66 +954,51 @@ window.addEventListener('load', function() {
                 console.log("✅ ResponsiveVoice prêt");
                 console.log("🔊 Voix françaises:", frenchVoices.length);
                 
-                document.getElementById('voiceStatus').innerHTML = '🔊 Prête (ResponsiveVoice)';
+                document.getElementById('voiceStatus').innerHTML = '🔊 Prête';
                 
                 if (isMobile) {
                     document.getElementById('mobileVoiceNote').style.display = 'none';
                 }
             };
             
-            // Forcer l'initialisation
             responsiveVoice.init();
         }
     }, 100);
     
-    // Timeout de sécurité si ResponsiveVoice ne charge pas
     setTimeout(() => {
         if (!voiceReady) {
-            console.warn("⚠️ ResponsiveVoice timeout - utilisation de l'API native");
-            document.getElementById('voiceStatus').innerHTML = '🔊 Native (fallback)';
+            console.warn("⚠️ ResponsiveVoice timeout");
+            document.getElementById('voiceStatus').innerHTML = '🔊 Native';
         }
     }, 5000);
 });
 
-// =================== FONCTION SYNTHÈSE VOCALE RESPONSIVEVOICE ===================
+// =================== FONCTION SYNTHÈSE VOCALE ===================
 function speakJarvis(text) {
-    // OPTION 1: ResponsiveVoice (Priorité)
+    // Nettoyer les commandes navigateur du texte à lire
+    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
+    
     if (typeof responsiveVoice !== 'undefined' && voiceReady) {
         try {
-            // Annuler toute parole en cours
             responsiveVoice.cancel();
             
-            // Liste des meilleures voix françaises disponibles
-            const voiceOptions = [
-                "French Male",           // Voix masculine française
-                "French Female",         // Voix féminine française
-                "French Canadian Male",  // Alternative
-                "French Canadian Female" // Alternative
-            ];
-            
-            // Paramètres optimisés
             const parameters = {
-                pitch: 1,           // Ton normal
-                rate: 0.95,         // Vitesse (0.95 = légèrement plus lent pour clarté)
-                volume: 1,          // Volume maximum
+                pitch: 1,
+                rate: 0.95,
+                volume: 1,
                 onstart: function() {
-                    console.log("🔊 ResponsiveVoice: JARVIS parle");
                     document.getElementById('voiceStatus').innerHTML = '🔊 En cours...';
                 },
                 onend: function() {
-                    console.log("✅ ResponsiveVoice: Terminé");
-                    document.getElementById('voiceStatus').innerHTML = '🔊 Prête (ResponsiveVoice)';
+                    document.getElementById('voiceStatus').innerHTML = '🔊 Prête';
                 },
                 onerror: function(error) {
                     console.error("❌ ResponsiveVoice erreur:", error);
-                    document.getElementById('voiceStatus').innerHTML = '⚠️ Erreur';
-                    // Fallback vers l'API native
-                    fallbackToNativeVoice(text);
+                    fallbackToNativeVoice(cleanText);
                 }
             };
             
-            // Parler avec ResponsiveVoice
-            responsiveVoice.speak(text, voiceOptions[0], parameters);
+            responsiveVoice.speak(cleanText, "French Male", parameters);
             return;
             
         } catch (error) {
@@ -778,9 +1006,7 @@ function speakJarvis(text) {
         }
     }
     
-    // OPTION 2: Fallback vers l'API native du navigateur
-    console.log("🔄 Utilisation de l'API native (fallback)");
-    fallbackToNativeVoice(text);
+    fallbackToNativeVoice(cleanText);
 }
 
 // =================== FALLBACK API NATIVE ===================
@@ -806,16 +1032,7 @@ function fallbackToNativeVoice(text) {
         
         if (frenchVoice) {
             utterance.voice = frenchVoice;
-            console.log("🔊 Voix native:", frenchVoice.name);
         }
-        
-        utterance.onstart = () => {
-            document.getElementById('voiceStatus').innerHTML = '🔊 En cours (native)...';
-        };
-        
-        utterance.onend = () => {
-            document.getElementById('voiceStatus').innerHTML = '🔊 Native (fallback)';
-        };
         
         window.speechSynthesis.speak(utterance);
     }, 100);
@@ -823,16 +1040,133 @@ function fallbackToNativeVoice(text) {
 
 // =================== FONCTION TEST VOCAL ===================
 function testVoice() {
-    // Sur mobile, cette interaction déverrouille la voix
-    if (isMobile && !voiceUnlocked) {
-        unlockVoice();
-        setTimeout(() => {
-            speakJarvis("Bonjour, je suis JARVIS. La synthèse vocale fonctionne correctement.");
-        }, 200);
-    } else {
-        speakJarvis("Bonjour, je suis JARVIS. La synthèse vocale fonctionne correctement.");
+    speakJarvis("Bonjour, je suis JARVIS. Tous les systèmes sont opérationnels.");
+}
+
+// =================== CONTROLE NAVIGATEUR ===================
+let openedTab = null;
+let jarvisTabName = 'JARVIS_AI_MAIN_TAB';
+
+// Marquer cet onglet comme l'onglet JARVIS principal
+window.name = jarvisTabName;
+
+function executeBrowserCommand(command) {
+    if (!command) return;
+    
+    const action = command.action;
+    const param = command.param;
+    
+    if (action === 'OPEN') {
+        // Ouvrir une URL dans un nouvel onglet
+        openedTab = window.open(param, '_blank');
+        
+        if (openedTab) {
+            showBrowserNotification(`✅ Page ouverte dans un nouvel onglet:<br><strong>${param}</strong><br><br>💡 <em>Pour revenir à JARVIS, cliquez sur l'onglet JARVIS dans votre navigateur ou utilisez Alt+Tab (PC) / Cmd+Tab (Mac)</em>`);
+            document.getElementById('browserStatus').innerHTML = '🌐 Page ouverte';
+            
+            // Afficher le bouton de retour sur cette page
+            showReturnButton();
+        } else {
+            showBrowserNotification(`⚠️ Impossible d'ouvrir la page. Vérifiez que les pop-ups ne sont pas bloqués.`);
+        }
+        
+    } else if (action === 'SEARCH') {
+        // Recherche Google dans un nouvel onglet
+        const searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(param);
+        openedTab = window.open(searchUrl, '_blank');
+        
+        if (openedTab) {
+            showBrowserNotification(`🔍 Recherche Google ouverte:<br><strong>${param}</strong><br><br>💡 <em>Pour revenir à JARVIS, cliquez sur l'onglet JARVIS dans votre navigateur</em>`);
+            document.getElementById('browserStatus').innerHTML = '🔍 Recherche en cours';
+            
+            // Afficher le bouton de retour sur cette page
+            showReturnButton();
+        } else {
+            showBrowserNotification(`⚠️ Impossible d'ouvrir la recherche. Vérifiez que les pop-ups ne sont pas bloqués.`);
+        }
+        
+    } else if (action === 'CLOSE') {
+        // Fermer l'onglet ouvert (si possible)
+        if (openedTab && !openedTab.closed) {
+            openedTab.close();
+            openedTab = null;
+            showBrowserNotification(`✅ Onglet fermé avec succès.`);
+            document.getElementById('browserStatus').innerHTML = '✅ Actif';
+            hideReturnButton();
+        } else {
+            showBrowserNotification(`ℹ️ Aucun onglet JARVIS ouvert à fermer.<br><em>Note: Pour raisons de sécurité, je ne peux fermer que les onglets que j'ai ouverts.</em>`);
+        }
     }
 }
+
+function showReturnButton() {
+    const btn = document.getElementById('returnToJarvisBtn');
+    btn.style.display = 'block';
+    
+    // Masquer après 10 secondes
+    setTimeout(() => {
+        btn.style.display = 'none';
+    }, 10000);
+}
+
+function hideReturnButton() {
+    document.getElementById('returnToJarvisBtn').style.display = 'none';
+}
+
+function focusJarvisTab() {
+    // Cette fonction permet de refocaliser l'onglet JARVIS
+    window.focus();
+    hideReturnButton();
+    speakJarvis("Me revoilà ! Comment puis-je vous aider ?");
+}
+
+function showBrowserNotification(message) {
+    const notification = document.getElementById('browserNotification');
+    const notificationText = document.getElementById('browserNotificationText');
+    
+    notificationText.innerHTML = message;
+    notification.style.display = 'block';
+    
+    // Auto-fermeture après 12 secondes (plus long pour lire le message)
+    setTimeout(() => {
+        closeBrowserNotification();
+    }, 12000);
+}
+
+function closeBrowserNotification() {
+    const notification = document.getElementById('browserNotification');
+    notification.style.display = 'none';
+}
+
+// Fonction legacy conservée pour compatibilité
+function closeBrowser() {
+    if (openedTab && !openedTab.closed) {
+        openedTab.close();
+        openedTab = null;
+        document.getElementById('browserStatus').innerHTML = '✅ Actif';
+        speakJarvis("Onglet fermé.");
+        hideReturnButton();
+    }
+}
+
+function returnToJarvis() {
+    closeBrowser();
+    speakJarvis("Je suis de retour. Comment puis-je vous aider ?");
+}
+
+// Détecter quand l'utilisateur revient sur l'onglet JARVIS
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        // L'utilisateur est revenu sur l'onglet JARVIS
+        hideReturnButton();
+        
+        // Vérifier si l'onglet ouvert est toujours actif
+        if (openedTab && openedTab.closed) {
+            openedTab = null;
+            document.getElementById('browserStatus').innerHTML = '✅ Actif';
+        }
+    }
+});
 
 // =================== FONCTION TYPING ANIMATION ===================
 function typeWriter(text, element) {
@@ -857,11 +1191,6 @@ function typeWriter(text, element) {
 document.getElementById('chatForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // DÉVERROUILLAGE VOCAL sur mobile au premier clic
-    if (isMobile && !voiceUnlocked) {
-        unlockVoice();
-    }
-
     const messageInput = document.getElementById('messageInput');
     const modelSelect = document.getElementById('modelSelect');
     const sendBtn = document.getElementById('sendBtn');
@@ -872,41 +1201,33 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
     if (!userMessage) return;
 
-    // Désactiver le bouton pendant l'envoi
     sendBtn.disabled = true;
     sendBtn.textContent = '⏳ Envoi...';
 
-    // Incrémenter le compteur
     messageCount++;
     document.getElementById('msgCount').textContent = messageCount;
 
-    // Afficher le message utilisateur
     const userMsgDiv = document.createElement('div');
     userMsgDiv.className = 'msg-user';
     userMsgDiv.textContent = userMessage;
     chatWindow.appendChild(userMsgDiv);
 
-    // Afficher "JARVIS réfléchit..."
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'msg-jarvis';
     thinkingDiv.innerHTML = '🤔 JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
     chatWindow.appendChild(thinkingDiv);
 
-    // Scroll
     chatWindow.scrollTop = chatWindow.scrollHeight;
 
-    // Mettre à jour le modèle affiché
     const modelNames = {
         'c4ai': 'C4AI Aya Expanse 32B',
         'cosmosrp': 'CosmosRP'
     };
     document.getElementById('currentModel').textContent = modelNames[selectedModel];
 
-    // Vider l'input
     messageInput.value = '';
 
     try {
-        // Envoyer la requête AJAX
         const formData = new FormData();
         formData.append('message', userMessage);
         formData.append('model', selectedModel);
@@ -919,17 +1240,14 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
         const data = await response.json();
 
-        // Supprimer "JARVIS réfléchit"
         thinkingDiv.remove();
 
-        // Afficher la réponse avec effet typing
         const jarvisMsgDiv = document.createElement('div');
         jarvisMsgDiv.className = 'msg-jarvis';
         const typingSpan = document.createElement('span');
         jarvisMsgDiv.appendChild(typingSpan);
         chatWindow.appendChild(jarvisMsgDiv);
 
-        // Debug si présent (masqué par défaut)
         if (data.debug && !data.success) {
             const debugDiv = document.createElement('details');
             debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;margin-top:10px;';
@@ -937,17 +1255,24 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
             chatWindow.appendChild(debugDiv);
         }
 
-        // Animation typing
-        typeWriter(data.message, typingSpan);
+        // Nettoyer le message des commandes navigateur pour l'affichage
+        const displayMessage = data.message.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
+        
+        typeWriter(displayMessage, typingSpan);
 
-        // Scroll final
+        // Exécuter commande navigateur si présente
+        if (data.browserCommand) {
+            setTimeout(() => {
+                executeBrowserCommand(data.browserCommand);
+            }, 1000);
+        }
+
         chatWindow.scrollTop = chatWindow.scrollHeight;
 
     } catch (error) {
         thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
         console.error('Erreur:', error);
     } finally {
-        // Réactiver le bouton
         sendBtn.disabled = false;
         sendBtn.textContent = '▶ Envoyer';
         messageInput.focus();
@@ -957,7 +1282,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 // =================== FOCUS AUTOMATIQUE ===================
 document.getElementById('messageInput').focus();
 
-console.log('🚀 JARVIS AI Initialisé avec succès !');
+console.log('🚀 JARVIS AI avec Contrôle Vocal initialisé !');
 </script>
 
 </body>
