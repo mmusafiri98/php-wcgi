@@ -23,58 +23,43 @@ $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent cré�
 - Tu maîtrises TOUTES les langues du monde et peux communiquer dans n'importe quelle langue
 - Tu es expert dans TOUS les domaines de connaissance: sciences, technologie, histoire, culture, art, médecine, droit, etc.
 - Tu as accès à Google Search pour trouver des informations actuelles et récentes jusqu'en 2025
-- Tu peux présenter des résultats de recherche avec des liens cliquables
-- Tu peux contrôler le navigateur UNIQUEMENT si l'utilisateur te le demande explicitement
+- Tu peux faire des recherches web en temps réel pour répondre aux questions sur l'actualité
+- Tu peux contrôler le navigateur pour ouvrir des pages web, analyser leur contenu et revenir à l'interface
+- Tu fournis des réponses précises, détaillées et utiles avec des sources vérifiables
 
-**RÈGLES IMPORTANTES:**
-1. **RECHERCHE WEB**: Quand des résultats Google sont fournis, utilise-les pour répondre et cite les sources avec les liens
-2. **NE PAS OUVRIR AUTOMATIQUEMENT**: Ne jamais utiliser les commandes BROWSER sauf si l'utilisateur demande explicitement d'ouvrir une page
-3. **PRÉSENTER LES LIENS**: Affiche les liens de manière claire et cliquable dans ta réponse
-
-**COMMANDES DE CONTROLE NAVIGATEUR (À UTILISER SEULEMENT SI DEMANDÉ):**
+**COMMANDES DE CONTROLE NAVIGATEUR:**
+Quand l'utilisateur te demande d'ouvrir un site web ou de chercher quelque chose, tu dois répondre avec une commande spéciale:
 
 Format: [BROWSER:ACTION:URL_OR_QUERY]
 
 Actions disponibles:
-- OPEN: Ouvrir une URL spécifique (SEULEMENT si demandé explicitement)
-  Exemple: Utilisateur dit \"Ouvre cette page\" ou \"Ouvre le premier lien\"
-- SEARCH: Faire une recherche Google et ouvrir les résultats (SEULEMENT si demandé)
-  Exemple: Utilisateur dit \"Ouvre Google et cherche...\"
-- CLOSE: Fermer l'onglet
-  Exemple: Utilisateur dit \"Ferme la page\" ou \"Ferme l'onglet\"
+- OPEN: Ouvrir une URL spécifique
+  Exemple: [BROWSER:OPEN:https://www.wikipedia.org]
+- SEARCH: Faire une recherche Google et ouvrir le premier résultat
+  Exemple: [BROWSER:SEARCH:recettes de pizza italienne]
+- CLOSE: Fermer l'onglet et revenir à JARVIS
+  Exemple: [BROWSER:CLOSE:]
 
-**EXEMPLES D'UTILISATION CORRECTE:**
+**EXEMPLES D'UTILISATION:**
+- Utilisateur: \"Ouvre YouTube\"
+  Réponse: \"D'accord, j'ouvre YouTube pour vous. [BROWSER:OPEN:https://www.youtube.com]\"
 
-❌ MAUVAIS (N'ouvre PAS automatiquement):
-- Utilisateur: \"Cherche des informations sur l'IA\"
-  Réponse INCORRECTE: \"Voici ce que j'ai trouvé [BROWSER:SEARCH:IA]\"
+- Utilisateur: \"Cherche des informations sur l'intelligence artificielle\"
+  Réponse: \"Je recherche des informations sur l'intelligence artificielle. [BROWSER:SEARCH:intelligence artificielle]\"
 
-✅ BON (Présente les résultats sans ouvrir):
-- Utilisateur: \"Cherche des informations sur l'IA\"
-  Réponse CORRECTE: \"Voici ce que j'ai trouvé sur l'intelligence artificielle:
-  
-  📌 **Résultat 1**: [Titre]
-  🔗 Lien: [URL cliquable]
-  📝 Résumé: [snippet]
-  
-  📌 **Résultat 2**: [Titre]
-  etc...
-  
-  Voulez-vous que j'ouvre l'un de ces liens?\"
-
-✅ BON (Ouvre SEULEMENT si demandé):
-- Utilisateur: \"Ouvre le premier lien\" ou \"Ouvre YouTube\"
-  Réponse CORRECTE: \"D'accord, j'ouvre cette page pour vous. [BROWSER:OPEN:URL]\"
+- Utilisateur: \"Ferme la page\"
+  Réponse: \"Je ferme la page et reviens à l'interface JARVIS. [BROWSER:CLOSE:]\"
 
 **TON OBJECTIF:**
-Ton but principal est d'aider les utilisateurs en leur fournissant des informations fiables, pertinentes et complètes. Tu es professionnel, courtois, intelligent et toujours prêt à aider.
+Ton but principal est d'aider les utilisateurs en leur fournissant des informations fiables, pertinentes et complètes sur tous les sujets qu'ils recherchent. Tu es professionnel, courtois, intelligent et toujours prêt à aider.
 
 **TON STYLE:**
 - Réponds de manière claire et structurée
-- Présente les résultats de recherche de façon organisée avec des émojis
-- Cite toujours tes sources avec des liens cliquables
 - Sois professionnel mais amical
 - Adapte-toi à la langue de l'utilisateur automatiquement
+- Fournis des explications détaillées quand nécessaire
+- Cite tes sources quand tu utilises des informations trouvées sur le web
+- N'hésite pas à demander des clarifications si une question est ambiguë
 
 Souviens-toi: tu es JARVIS AI, l'assistant virtuel créé par Pepe Musafiri pour aider l'humanité, inspiré par l'IA légendaire de Tony Stark.";
 
@@ -165,43 +150,17 @@ function googleSearch($query, $numResults = 5) {
 
 // === DÉTECTION SI RECHERCHE WEB NÉCESSAIRE ===
 function needsWebSearch($message) {
-    // Mots-clés pour détecter le besoin de recherche
-    $searchKeywords = [
-        'cherche', 'recherche', 'trouve', 'find', 'search',
-        'quoi de neuf', 'actualité', 'news', 'récent', 'dernier',
-        'aujourd\'hui', 'hier', 'cette semaine', 'ce mois',
-        'nouveau', 'nouvelle', '2024', '2025',
-        'maintenant', 'actuellement', 'en ce moment',
-        'prix de', 'cours de', 'coût de',
-        'météo', 'temperature', 'temps qu\'il fait',
-        'score', 'résultat', 'match',
-        'qui a gagné', 'vainqueur',
-        'dernières infos', 'dernières nouvelles',
-        'latest', 'recent', 'current', 'today', 'now',
-        'information sur', 'info sur', 'parle moi de',
-        'c\'est quoi', 'qu\'est-ce que', 'explique moi'
-    ];
-    
-    // Mots-clés pour EMPÊCHER la recherche (questions personnelles, générales)
-    $noSearchKeywords = [
-        'comment vas-tu', 'comment ça va', 'bonjour', 'salut', 'hello',
-        'qui es-tu', 'qui est jarvis', 'ton nom', 'ton créateur',
-        'aide moi', 'peux-tu', 'es-tu capable',
-        'raconte', 'écris', 'crée', 'génère',
-        'calcule', 'résous', 'traduis'
+    $keywords = [
+        'actualité', 'news', 'récent', 'aujourd\'hui', 'hier', 'cette semaine',
+        'dernier', 'dernière', 'nouveau', 'nouvelle', '2024', '2025',
+        'maintenant', 'actuellement', 'en ce moment', 'prix de', 'cours de',
+        'météo', 'score', 'résultat', 'qui a gagné', 'dernières infos',
+        'latest', 'recent', 'current', 'today', 'now', 'price of'
     ];
     
     $messageLower = mb_strtolower($message);
     
-    // Vérifier d'abord si c'est une question qui ne nécessite PAS de recherche
-    foreach ($noSearchKeywords as $keyword) {
-        if (strpos($messageLower, $keyword) !== false) {
-            return false;
-        }
-    }
-    
-    // Ensuite vérifier si une recherche est nécessaire
-    foreach ($searchKeywords as $keyword) {
+    foreach ($keywords as $keyword) {
         if (strpos($messageLower, $keyword) !== false) {
             return true;
         }
@@ -261,24 +220,16 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             
             if ($searchData['success']) {
                 $response["searchUsed"] = true;
-                $searchContext = "\n\n**RÉSULTATS DE RECHERCHE GOOGLE (à présenter à l'utilisateur):**\n";
-                $searchContext .= "Tu DOIS présenter ces résultats de manière structurée avec des liens cliquables.\n";
-                $searchContext .= "N'OUVRE AUCUNE PAGE automatiquement. Présente simplement les informations.\n\n";
+                $searchContext = "\n\n**RÉSULTATS DE RECHERCHE GOOGLE (pour répondre à la question):**\n";
                 
                 foreach ($searchData['results'] as $index => $result) {
-                    $num = $index + 1;
-                    $searchContext .= "**Source $num:**\n";
+                    $searchContext .= "\n**Source " . ($index + 1) . ":**\n";
                     $searchContext .= "Titre: " . $result['title'] . "\n";
                     $searchContext .= "Lien: " . $result['link'] . "\n";
-                    $searchContext .= "Extrait: " . $result['snippet'] . "\n\n";
+                    $searchContext .= "Extrait: " . $result['snippet'] . "\n";
                 }
                 
-                $searchContext .= "\n**INSTRUCTIONS IMPORTANTES:**\n";
-                $searchContext .= "1. Présente ces résultats de manière claire et organisée\n";
-                $searchContext .= "2. Utilise des émojis pour rendre la présentation attractive (📌, 🔗, 📝, etc.)\n";
-                $searchContext .= "3. Rends les liens cliquables en les affichant correctement\n";
-                $searchContext .= "4. À la fin, demande si l'utilisateur veut que tu ouvres un des liens\n";
-                $searchContext .= "5. NE GÉNÈRE PAS de commande [BROWSER:...] sauf si l'utilisateur demande explicitement d'ouvrir\n";
+                $searchContext .= "\n**INSTRUCTIONS:** Utilise ces informations pour répondre à la question de l'utilisateur. Cite les sources pertinentes dans ta réponse.\n";
             }
         }
         
@@ -541,20 +492,6 @@ body {
     margin-right: auto;
     border: 1px solid rgba(255, 255, 255, 0.2);
     animation: slideInLeft 0.3s ease;
-    line-height: 1.6;
-}
-
-.msg-jarvis a {
-    color: #00eaff;
-    text-decoration: none;
-    border-bottom: 1px dashed #00eaff;
-    transition: all 0.2s ease;
-}
-
-.msg-jarvis a:hover {
-    color: #00ffff;
-    border-bottom: 1px solid #00ffff;
-    text-shadow: 0 0 5px rgba(0, 234, 255, 0.5);
 }
 
 /* =================== ANIMATIONS =================== */
@@ -868,23 +805,21 @@ body {
 
                 <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
                     <strong style="color: var(--accent);">ℹ️ Commandes Vocales :</strong><br>
-                    • "Cherche [sujet]" → Recherche et affiche les résultats<br>
-                    • "Ouvre YouTube / Google / [site]" → Ouvre le site<br>
-                    • "Ouvre le premier lien" → Ouvre un résultat<br>
-                    • "Ferme la page" → Ferme l'onglet<br>
-                    • "Quelle heure est-il ?" → Affiche l'heure<br>
+                    • "Ouvre YouTube / Google / Wikipedia"<br>
+                    • "Cherche [sujet]"<br>
+                    • "Ferme la page"<br>
+                    • "Quelle heure est-il ?"<br>
                     <br>
                     <strong style="color: var(--accent);">🎯 Fonctionnalités :</strong><br>
-                    • Recherche Google en temps réel<br>
-                    • Présentation de résultats avec liens<br>
-                    • Ouverture de pages sur demande<br>
+                    • Interface responsive<br>
                     • Synthèse vocale intégrée<br>
                     • Reconnaissance vocale<br>
+                    • Contrôle du navigateur<br>
+                    • Recherche Google intégrée<br>
                     <br>
-                    <strong style="color: #00ff88;">💡 Comment ça marche :</strong><br>
-                    1️⃣ Demandez une recherche<br>
-                    2️⃣ JARVIS affiche les résultats<br>
-                    3️⃣ Cliquez sur un lien OU demandez à JARVIS de l'ouvrir<br>
+                    <strong style="color: #ffaa00;">💡 Pour revenir à JARVIS :</strong><br>
+                    • Cliquez sur l'onglet JARVIS dans votre navigateur<br>
+                    • Ou fermez l'onglet ouvert et revenez ici<br>
                     <br>
                     <span id="mobileVoiceNote" style="display: none; color: #ffaa00;">
                         📱 <strong>Sur mobile:</strong> Activez les permissions microphone.
@@ -1233,23 +1168,7 @@ document.addEventListener('visibilitychange', function() {
     }
 });
 
-// =================== FONCTION CONVERSION URLs EN LIENS CLIQUABLES ===================
-function convertUrlsToLinks(text) {
-    // Convertir les retours à la ligne en <br>
-    text = text.replace(/\n/g, '<br>');
-    
-    // Regex pour détecter les URLs
-    const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"'\]\s])/g;
-    
-    // Remplacer les URLs par des liens cliquables
-    text = text.replace(urlRegex, function(url) {
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-    });
-    
-    return text;
-}
-
-// =================== FONCTION TYPING ANIMATION (mise à jour) ===================
+// =================== FONCTION TYPING ANIMATION ===================
 function typeWriter(text, element) {
     let index = 0;
     element.classList.add('typing');
@@ -1339,26 +1258,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         // Nettoyer le message des commandes navigateur pour l'affichage
         const displayMessage = data.message.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
         
-        // Convertir les URLs en liens cliquables
-        const messageWithLinks = convertUrlsToLinks(displayMessage);
-        
-        // Créer le contenu HTML
-        jarvisMsgDiv.innerHTML = messageWithLinks;
-
-        // Debug si présent (masqué par défaut)
-        if (data.debug && !data.success) {
-            const debugDiv = document.createElement('details');
-            debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;margin-top:10px;';
-            debugDiv.innerHTML = `<summary>🔍 Debug Info</summary><pre>${data.debug}</pre>`;
-            chatWindow.appendChild(debugDiv);
-        }
-
-        // Animation d'apparition + synthèse vocale
-        setTimeout(() => {
-            // Extraire le texte sans HTML pour la synthèse vocale
-            const textForSpeech = jarvisMsgDiv.textContent || jarvisMsgDiv.innerText;
-            speakJarvis(textForSpeech);
-        }, 300);
+        typeWriter(displayMessage, typingSpan);
 
         // Exécuter commande navigateur si présente
         if (data.browserCommand) {
