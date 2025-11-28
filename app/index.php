@@ -1,7 +1,7 @@
 <?php
 // =====================================================
 // JARVIS AI - VERSION COMPLETE AVEC GOOGLE SEARCH + RECONNAISSANCE VOCALE + CONTROLE NAVIGATEUR
-// Mobile First + Responsive + Voice + Web Search + Browser Control
+// Mobile First + Responsive + Voice + Web Search + Browser Control + GIF FIXE
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -370,6 +370,8 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     --panel-bg: rgba(0, 255, 255, 0.06);
     --border-color: rgba(0, 255, 255, 0.15);
     --red-glow: #ff0040;
+    --header-height: 220px; /* Hauteur du header fixe sur desktop */
+    --header-height-mobile: 180px; /* Hauteur du header fixe sur mobile */
 }
 
 /* =================== BASE =================== */
@@ -385,25 +387,27 @@ body {
     font-family: "Orbitron", Arial, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
+    padding-top: var(--header-height-mobile);
 }
 
-/* =================== LAYOUT CONTAINER =================== */
-.main-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 15px;
+/* =================== FIXED HEADER JARVIS =================== */
+.jarvis-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: linear-gradient(180deg, var(--bg-dark) 0%, rgba(2, 6, 16, 0.98) 100%);
+    border-bottom: 2px solid var(--border-color);
+    box-shadow: 0 5px 30px rgba(0, 234, 255, 0.3);
+    backdrop-filter: blur(10px);
 }
 
-/* =================== JARVIS GIF SECTION =================== */
 .jarvis-visual {
     width: 100%;
-    height: 300px;
-    border-radius: 15px;
+    height: var(--header-height-mobile);
     overflow: hidden;
     background: #000;
-    border: 2px solid var(--border-color);
-    box-shadow: 0 0 30px rgba(0, 234, 255, 0.3);
-    margin-bottom: 20px;
     position: relative;
 }
 
@@ -422,6 +426,28 @@ body {
     bottom: 0;
     background: linear-gradient(45deg, transparent, rgba(0, 234, 255, 0.1));
     pointer-events: none;
+}
+
+/* Logo JARVIS centré sur le GIF */
+.jarvis-logo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(0, 234, 255, 0.8), 0 0 40px rgba(0, 234, 255, 0.5);
+    letter-spacing: 8px;
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* =================== LAYOUT CONTAINER =================== */
+.main-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 15px;
 }
 
 /* =================== PANELS =================== */
@@ -480,6 +506,7 @@ body {
     margin-left: auto;
     border: 1px solid rgba(0, 234, 255, 0.3);
     animation: slideInRight 0.3s ease;
+    word-wrap: break-word;
 }
 
 .msg-jarvis {
@@ -492,6 +519,7 @@ body {
     margin-right: auto;
     border: 1px solid rgba(255, 255, 255, 0.2);
     animation: slideInLeft 0.3s ease;
+    word-wrap: break-word;
 }
 
 /* =================== ANIMATIONS =================== */
@@ -515,6 +543,18 @@ body {
     50% { transform: scale(1.1); }
 }
 
+@keyframes glowPulse {
+    0%, 100% { 
+        text-shadow: 0 0 20px rgba(0, 234, 255, 0.8), 
+                     0 0 40px rgba(0, 234, 255, 0.5); 
+    }
+    50% { 
+        text-shadow: 0 0 30px rgba(0, 234, 255, 1), 
+                     0 0 60px rgba(0, 234, 255, 0.8),
+                     0 0 80px rgba(0, 234, 255, 0.6); 
+    }
+}
+
 .typing {
     border-right: 3px solid var(--accent);
     animation: blink 1s infinite;
@@ -530,6 +570,10 @@ body {
 
 .dots span:nth-child(3) {
     animation-delay: 0.6s;
+}
+
+.jarvis-logo {
+    animation: glowPulse 3s ease-in-out infinite;
 }
 
 /* =================== VOICE BUTTON =================== */
@@ -654,8 +698,17 @@ body {
 
 /* =================== RESPONSIVE =================== */
 @media (min-width: 768px) {
+    body {
+        padding-top: var(--header-height);
+    }
+    
     .jarvis-visual {
-        height: 400px;
+        height: var(--header-height);
+    }
+    
+    .jarvis-logo {
+        font-size: 3rem;
+        letter-spacing: 12px;
     }
     
     #chatWindow {
@@ -664,8 +717,9 @@ body {
 }
 
 @media (min-width: 992px) {
-    .jarvis-visual {
-        height: 500px;
+    .jarvis-logo {
+        font-size: 3.5rem;
+        letter-spacing: 15px;
     }
 }
 
@@ -674,8 +728,9 @@ body {
         padding: 10px;
     }
     
-    .jarvis-visual {
-        height: 250px;
+    .jarvis-logo {
+        font-size: 1.5rem;
+        letter-spacing: 5px;
     }
     
     #chatWindow {
@@ -706,13 +761,17 @@ body {
 </head>
 
 <body>
-<div class="main-container">
 
-    <!-- ============= JARVIS GIF (ALWAYS ON TOP) ============= -->
+<!-- ============= FIXED JARVIS HEADER ============= -->
+<div class="jarvis-header">
     <div class="jarvis-visual">
         <img src="jarvis.gif" alt="JARVIS Interface" loading="eager">
+        <div class="jarvis-logo">JARVIS AI</div>
     </div>
+</div>
 
+<!-- ============= MAIN CONTENT ============= -->
+<div class="main-container">
     <div class="row g-3">
         
         <!-- ============= CHAT PANEL ============= -->
@@ -732,107 +791,105 @@ body {
                             type="text" 
                             id="messageInput" 
                             class="form-control" 
-                            placeholder="Tapez votre message ici..."
-                            autocomplete="off"
-                            required
-                        >
-                    </div>
-
-                    <div class="row g-2 align-items-center">
-                        <div class="col-12 col-sm-7 col-md-5">
-                            <select id="modelSelect" class="form-select">
-                                <option value="c4ai">🤖 C4AI Aya Expanse 32B</option>
-                                <option value="cosmosrp">🌌 CosmosRP</option>
-                            </select>
-                        </div>
-                        <div class="col-auto">
-                            <button type="button" id="voiceBtn" class="voice-btn" title="Reconnaissance vocale">
-                                🎤
-                            </button>
-                        </div>
-                        <div class="col">
-                            <button type="submit" id="sendBtn" class="btn btn-send w-100">
-                                ▶ Envoyer
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- ============= STATUS PANEL ============= -->
-        <div class="col-12 col-lg-4">
-            <div class="panel">
-                <div class="panel-header">⚙️ SYSTÈME</div>
-
-                <div class="status-item">
-                    <span class="status-label">Statut</span>
-                    <span class="status-value">🟢 En ligne</span>
-                </div>
-
-                <div class="status-item">
-                    <span class="status-label">Modèle actuel</span>
-                    <span class="status-value" id="currentModel">C4AI Aya Expanse 32B</span>
-                </div>
-
-                <div class="status-item">
-                    <span class="status-label">Synthèse vocale</span>
-                    <span class="status-value" id="voiceStatus">🔄 Chargement...</span>
-                </div>
-
-                <div class="status-item">
-                    <span class="status-label">Reconnaissance vocale</span>
-                    <span class="status-value" id="speechStatus">🔄 Vérification...</span>
-                </div>
-
-                <div class="status-item">
-                    <span class="status-label">Contrôle navigateur</span>
-                    <span class="status-value" id="browserStatus">✅ Actif</span>
-                </div>
-
-                <div class="status-item">
-                    <button onclick="testVoice()" class="btn btn-sm" style="background: rgba(0,234,255,0.2); border: 1px solid var(--accent); color: var(--accent); padding: 5px 15px; border-radius: 8px; font-size: 0.85rem; width: 100%;">
-                        🔊 Tester la voix
-                    </button>
-                </div>
-
-                <div class="status-item">
-                    <span class="status-label">Messages envoyés</span>
-                    <span class="status-value" id="msgCount">0</span>
-                </div>
-
-                <hr style="border-color: var(--border-color); margin: 20px 0;">
-
-                <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
-                    <strong style="color: var(--accent);">ℹ️ Commandes Vocales :</strong><br>
-                    • "Ouvre YouTube / Google / Wikipedia"<br>
-                    • "Cherche [sujet]"<br>
-                    • "Ferme la page"<br>
-                    • "Quelle heure est-il ?"<br>
-                    <br>
-                    <strong style="color: var(--accent);">🎯 Fonctionnalités :</strong><br>
-                    • Interface responsive<br>
-                    • Synthèse vocale intégrée<br>
-                    • Reconnaissance vocale<br>
-                    • Contrôle du navigateur<br>
-                    • Recherche Google intégrée<br>
-                    <br>
-                    <strong style="color: #ffaa00;">💡 Pour revenir à JARVIS :</strong><br>
-                    • Cliquez sur l'onglet JARVIS dans votre navigateur<br>
-                    • Ou fermez l'onglet ouvert et revenez ici<br>
-                    <br>
-                    <span id="mobileVoiceNote" style="display: none; color: #ffaa00;">
-                        📱 <strong>Sur mobile:</strong> Activez les permissions microphone.
-                    </span>
-                </div>
-            </div>
-        </div>
-
-    </div>
+                            placeholder="Tapez votre message ici..."PCContinuaautocomplete="off"
+required
+>
 </div>
+                <div class="row g-2 align-items-center">
+                    <div class="col-12 col-sm-7 col-md-5">
+                        <select id="modelSelect" class="form-select">
+                            <option value="c4ai">🤖 C4AI Aya Expanse 32B</option>
+                            <option value="cosmosrp">🌌 CosmosRP</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" id="voiceBtn" class="voice-btn" title="Reconnaissance vocale">
+                            🎤
+                        </button>
+                    </div>
+                    <div class="col">
+                        <button type="submit" id="sendBtn" class="btn btn-send w-100">
+                            ▶ Envoyer
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 
+    <!-- ============= STATUS PANEL ============= -->
+    <div class="col-12 col-lg-4">
+        <div class="panel">
+            <div class="panel-header">⚙️ SYSTÈME</div>
+
+            <div class="status-item">
+                <span class="status-label">Statut</span>
+                <span class="status-value">🟢 En ligne</span>
+            </div>
+
+            <div class="status-item">
+                <span class="status-label">Modèle actuel</span>
+                <span class="status-value" id="currentModel">C4AI Aya Expanse 32B</span>
+            </div>
+
+            <div class="status-item">
+                <span class="status-label">Synthèse vocale</span>
+                <span class="status-value" id="voiceStatus">🔄 Chargement...</span>
+            </div>
+
+            <div class="status-item">
+                <span class="status-label">Reconnaissance vocale</span>
+                <span class="status-value" id="speechStatus">🔄 Vérification...</span>
+            </div>
+
+            <div class="status-item">
+                <span class="status-label">Contrôle navigateur</span>
+                <span class="status-value" id="browserStatus">✅ Actif</span>
+            </div>
+
+            <div class="status-item">
+                <button onclick="testVoice()" class="btn btn-sm" style="background: rgba(0,234,255,0.2); border: 1px solid var(--accent); color: var(--accent); padding: 5px 15px; border-radius: 8px; font-size: 0.85rem; width: 100%;">
+                    🔊 Tester la voix
+                </button>
+            </div>
+
+            <div class="status-item">
+                <span class="status-label">Messages envoyés</span>
+                <span class="status-value" id="msgCount">0</span>
+            </div>
+
+            <hr style="border-color: var(--border-color); margin: 20px 0;">
+
+            <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
+                <strong style="color: var(--accent);">ℹ️ Commandes Vocales :</strong><br>
+                • "Ouvre YouTube / Google / Wikipedia"<br>
+                • "Cherche [sujet]"<br>
+                • "Ferme la page"<br>
+                • "Quelle heure est-il ?"<br>
+                <br>
+                <strong style="color: var(--accent);">🎯 Fonctionnalités :</strong><br>
+                • Interface responsive<br>
+                • Synthèse vocale intégrée<br>
+                • Reconnaissance vocale<br>
+                • Contrôle du navigateur<br>
+                • Recherche Google intégrée<br>
+                • Header JARVIS fixe<br>
+                <br>
+                <strong style="color: #ffaa00;">💡 Pour revenir à JARVIS :</strong><br>
+                • Cliquez sur l'onglet JARVIS dans votre navigateur<br>
+                • Ou fermez l'onglet ouvert et revenez ici<br>
+                <br>
+                <span id="mobileVoiceNote" style="display: none; color: #ffaa00;">
+                    📱 <strong>Sur mobile:</strong> Activez les permissions microphone.
+                </span>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
 <!-- ============= BROWSER CONTROL NOTIFICATION ============= -->
-<div id="browserNotification" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 10000; background: rgba(0, 234, 255, 0.95); color: #000; padding: 20px; border-radius: 15px; box-shadow: 0 5px 30px rgba(0, 234, 255, 0.5); max-width: 350px; font-family: 'Orbitron', Arial;">
+<div id="browserNotification" style="display: none; position: fixed; top: 240px; right: 20px; z-index: 10000; background: rgba(0, 234, 255, 0.95); color: #000; padding: 20px; border-radius: 15px; box-shadow: 0 5px 30px rgba(0, 234, 255, 0.5); max-width: 350px; font-family: 'Orbitron', Arial;">
     <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 10px;">
         🌐 JARVIS - Contrôle Navigateur
     </div>
@@ -842,17 +899,14 @@ body {
         ✓ OK, Compris
     </button>
 </div>
-
 <!-- ============= RETURN TO JARVIS BUTTON (FLOATING) ============= -->
 <div id="returnToJarvisBtn" style="display: none; position: fixed; bottom: 30px; right: 30px; z-index: 10001;">
     <button onclick="focusJarvisTab()" style="background: linear-gradient(135deg, #00eaff, #0088cc); border: none; color: #000; font-weight: 700; padding: 15px 30px; border-radius: 50px; cursor: pointer; font-family: 'Orbitron', Arial; font-size: 1rem; box-shadow: 0 5px 25px rgba(0, 234, 255, 0.6); transition: all 0.3s ease;">
         🏠 Retour à JARVIS
     </button>
 </div>
-
 <!-- ============= RESPONSIVEVOICE LIBRARY ============= -->
 <script src="https://code.responsivevoice.org/responsivevoice.js?key=A0SDeHMK"></script>
-
 <!-- ============= MAIN JAVASCRIPT ============= -->
 <script>
 // =================== VARIABLES GLOBALES ===================
@@ -1252,38 +1306,35 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
             const debugDiv = document.createElement('details');
             debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;margin-top:10px;';
             debugDiv.innerHTML = `<summary>🔍 Debug Info</summary><pre>${data.debug}</pre>`;
-            chatWindow.appendChild(debugDiv);
-        }
-
-        // Nettoyer le message des commandes navigateur pour l'affichage
-        const displayMessage = data.message.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
-        
-        typeWriter(displayMessage, typingSpan);
-
-        // Exécuter commande navigateur si présente
-        if (data.browserCommand) {
-            setTimeout(() => {
-                executeBrowserCommand(data.browserCommand);
-            }, 1000);
-        }
-
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-
-    } catch (error) {
-        thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
-        console.error('Erreur:', error);
-    } finally {
-        sendBtn.disabled = false;
-        sendBtn.textContent = '▶ Envoyer';
-        messageInput.focus();
+        chatWindow.appendChild(debugDiv);
     }
-});
 
+    // Nettoyer le message des commandes navigateur pour l'affichage
+    const displayMessage = data.message.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
+    
+    typeWriter(displayMessage, typingSpan);
+
+    // Exécuter commande navigateur si présente
+    if (data.browserCommand) {
+        setTimeout(() => {
+            executeBrowserCommand(data.browserCommand);
+        }, 1000);
+    }
+
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+} catch (error) {
+    thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
+    console.error('Erreur:', error);
+} finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = '▶ Envoyer';
+    messageInput.focus();
+}
+});
 // =================== FOCUS AUTOMATIQUE ===================
 document.getElementById('messageInput').focus();
-
-console.log('🚀 JARVIS AI avec Contrôle Vocal initialisé !');
+console.log('🚀 JARVIS AI avec Header Fixe initialisé !');
 </script>
-
 </body>
 </html>
