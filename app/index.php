@@ -404,7 +404,7 @@ body {
 }
 
 .jarvis-visual {
-    width: 100%;
+    width: 400%;
     height: var(--header-height-mobile);
     overflow: hidden;
     background: #000;
