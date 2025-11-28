@@ -703,7 +703,7 @@ body {
     }
     
     .jarvis-visual {
-        height: var(--header-height);
+        height: 100px;
     }
     
     .jarvis-logo {
@@ -766,7 +766,7 @@ body {
 <div class="jarvis-header">
     <div class="jarvis-visual">
         <img src="jarvis.gif" alt="JARVIS Interface" loading="eager">
-        <div class="jarvis-logo">JARVIS AI</div>
+    
     </div>
 </div>
 
