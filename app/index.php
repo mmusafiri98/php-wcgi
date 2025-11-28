@@ -370,8 +370,8 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     --panel-bg: rgba(0, 255, 255, 0.06);
     --border-color: rgba(0, 255, 255, 0.15);
     --red-glow: #ff0040;
-    --header-height: 220px; /* Hauteur du header fixe sur desktop */
-    --header-height-mobile: 180px; /* Hauteur du header fixe sur mobile */
+    --header-height: 120px; /* Réduit de 220px à 120px sur desktop */
+    --header-height-mobile: 100px; /* Réduit de 180px à 100px sur mobile */
 }
 
 /* =================== BASE =================== */
@@ -409,12 +409,16 @@ body {
     overflow: hidden;
     background: #000;
     position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .jarvis-visual img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    width: auto;
+    height: 80%; /* Le GIF prend 80% de la hauteur du conteneur */
+    max-width: 90%; /* Ne dépasse pas 90% de la largeur */
+    object-fit: contain; /* Conserve les proportions */
 }
 
 .jarvis-visual::before {
@@ -431,14 +435,14 @@ body {
 /* Logo JARVIS centré sur le GIF */
 .jarvis-logo {
     position: absolute;
-    top: 50%;
+    top: 10px;
     left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 2rem;
+    transform: translateX(-50%);
+    font-size: 1.2rem;
     font-weight: 700;
     color: var(--accent);
     text-shadow: 0 0 20px rgba(0, 234, 255, 0.8), 0 0 40px rgba(0, 234, 255, 0.5);
-    letter-spacing: 8px;
+    letter-spacing: 5px;
     z-index: 10;
     pointer-events: none;
 }
@@ -703,12 +707,18 @@ body {
     }
     
     .jarvis-visual {
-        height: 100px;
+        height: var(--header-height);
+    }
+    
+    .jarvis-visual img {
+        height: 75%;
+        max-width: 80%;
     }
     
     .jarvis-logo {
-        font-size: 3rem;
-        letter-spacing: 12px;
+        font-size: 1.5rem;
+        letter-spacing: 8px;
+        top: 15px;
     }
     
     #chatWindow {
@@ -718,8 +728,13 @@ body {
 
 @media (min-width: 992px) {
     .jarvis-logo {
-        font-size: 3.5rem;
-        letter-spacing: 15px;
+        font-size: 1.8rem;
+        letter-spacing: 10px;
+    }
+    
+    .jarvis-visual img {
+        height: 85%;
+        max-width: 70%;
     }
 }
 
@@ -729,8 +744,14 @@ body {
     }
     
     .jarvis-logo {
-        font-size: 1.5rem;
-        letter-spacing: 5px;
+        font-size: 1rem;
+        letter-spacing: 3px;
+        top: 8px;
+    }
+    
+    .jarvis-visual img {
+        height: 70%;
+        max-width: 95%;
     }
     
     #chatWindow {
@@ -752,11 +773,21 @@ body {
     }
 }
 
+@media (max-width: 400px) {
+    .jarvis-logo {
+        font-size: 0.85rem;
+        letter-spacing: 2px;
+    }
+}
+
 /* =================== LOADING STATE =================== */
 .btn-send:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
+   
+
+
 </style>
 </head>
 
