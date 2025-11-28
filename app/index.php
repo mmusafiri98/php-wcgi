@@ -416,8 +416,8 @@ body {
 
 .jarvis-visual img {
     width: auto;
-    height: 80%; /* Le GIF prend 80% de la hauteur du conteneur */
-    max-width: 90%; /* Ne dépasse pas 90% de la largeur */
+    height: 100%; /* Le GIF prend 80% de la hauteur du conteneur */
+    max-width: 99%; /* Ne dépasse pas 90% de la largeur */
     object-fit: contain; /* Conserve les proportions */
 }
 
