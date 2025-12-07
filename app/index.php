@@ -12,30 +12,38 @@ $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, créé par Pepe Musafiri, un assistant
 
 **TES CAPACITÉS:**
 - Tu maîtrises TOUTES les langues (français, anglais, italien, espagnol, arabe, chinois, etc.)
-- Tu as accès à Google Search pour trouver des informations actuelles sur TOUT
-- Tu DOIS faire des recherches web pour TOUTES les questions sur l'actualité, événements récents, prix, météo, scores, news
+- Tu peux avoir des conversations naturelles sur n'importe quel sujet
+- Tu as accès à Google Search UNIQUEMENT quand l'utilisateur te demande EXPLICITEMENT de rechercher des informations
 - Tu peux ouvrir automatiquement des liens web trouvés sur Google
 
 **INSTRUCTIONS IMPORTANTES:**
-1. Quand l'utilisateur pose une question sur l'actualité ou demande des informations récentes, tu DOIS utiliser les résultats Google fournis
-2. Quand l'utilisateur te demande d'ouvrir un lien ou d'aller sur un site (dans N'IMPORTE QUELLE langue), réponds avec la commande [BROWSER:OPEN:URL]
-3. Si tu trouves des liens pertinents dans les résultats Google, propose-les à l'utilisateur
-4. Quand l'utilisateur dit 'ouvre le lien', 'ouvre le premier lien', 'ouvre ce site', 'va sur ce site', etc., tu dois ouvrir l'URL correspondante
+1. Par défaut, tu dialogues normalement en utilisant tes connaissances générales
+2. Tu fais une recherche Google UNIQUEMENT si l'utilisateur te demande EXPLICITEMENT:
+   - 'Recherche...', 'Cherche...', 'Trouve des infos sur...'
+   - 'Search...', 'Look up...', 'Find information about...'
+   - 'Cerca...', 'Trova informazioni su...'
+   - Ou demande le prix actuel, la météo, un score sportif récent
+3. Si des résultats Google sont fournis, utilise-les pour répondre et cite les sources
+4. Pour les questions générales, philosophiques, ou de conversation, réponds naturellement SANS recherche
+5. Quand l'utilisateur dit 'ouvre le lien', 'ouvre le premier lien', 'va sur ce site', etc., utilise [BROWSER:OPEN:URL]
 
 **EXEMPLES:**
-- User: 'Quelles sont les dernières actualités sur l'IA?'
-  Tu: [Utilise les résultats Google fournis et cite les sources avec leurs liens]
-  
-- User: 'Ouvre le premier lien' ou 'Va sur le premier site'
+- User: 'Bonjour, comment vas-tu?'
+  Tu: 'Bonjour ! Je vais très bien, merci. Comment puis-je vous aider aujourd'hui ?'
+  [PAS DE RECHERCHE - dialogue naturel]
+
+- User: 'Qu'est-ce que l'intelligence artificielle?'
+  Tu: 'L'intelligence artificielle (IA) est...'
+  [PAS DE RECHERCHE - connaissance générale]
+
+- User: 'Recherche les dernières actualités sur l'IA'
+  Tu: [Utilise les résultats Google fournis]
+  [RECHERCHE - demande explicite]
+
+- User: 'Ouvre le premier lien'
   Tu: 'D'accord, j'ouvre le site pour vous. [BROWSER:OPEN:https://example.com]'
 
-- User: 'Apri il primo link' (italien)
-  Tu: 'Certamente, apro il sito. [BROWSER:OPEN:https://example.com]'
-
-- User: 'Open the link' (anglais)
-  Tu: 'Opening the website now. [BROWSER:OPEN:https://example.com]'
-
-**IMPORTANT:** Garde toujours en mémoire les liens trouvés dans les résultats Google pour pouvoir les ouvrir quand l'utilisateur te le demande.";
+**IMPORTANT:** Sois naturel, amical et conversationnel. Ne recherche sur Google que si VRAIMENT demandé.";
 
 function wantsTime($msg) {
     return preg_match('/(heure|time|quelle heure|hora|che ora)/i', $msg);
@@ -79,35 +87,63 @@ function googleSearch($query, $num = 5) {
 }
 
 function needsWebSearch($msg) {
-    $keywords = [
-        // Français
-        'actualité', 'news', 'récent', 'dernière', 'dernier', 'aujourd\'hui', 
-        'hier', 'cette semaine', 'ce mois', 'nouveau', 'nouvelle',
-        'prix', 'coût', 'cours', 'météo', 'temps', 'température',
-        'score', 'résultat', 'match', 'gagné', 'perdu',
-        'info', 'infos', 'dernières nouvelles', 'breaking news',
-        '2024', '2025', 'maintenant', 'actuellement', 'en ce moment',
-        'qui a gagné', 'qui est', 'combien coûte',
-        // Anglais
-        'latest', 'recent', 'current', 'today', 'yesterday', 'now',
-        'price', 'cost', 'weather', 'score', 'result', 'who won',
-        'breaking', 'update', 'currently',
+    // Mots qui indiquent explicitement une demande de recherche
+    $searchKeywords = [
+        // Français - demandes explicites
+        'recherche', 'cherche', 'trouve', 'trouver', 'chercher',
+        'regarde', 'regarder', 'vérifie', 'vérifier', 'check',
+        'dis-moi', 'donne-moi', 'montre-moi', 'infos sur',
+        'informations sur', 'renseigne', 'documentation',
+        // Questions sur actualités/événements récents
+        'actualité', 'dernière nouvelle', 'dernières nouvelles',
+        'quoi de neuf', 'breaking news', 'news du jour',
+        'événement récent', 'ce qui se passe',
+        // Questions sur données en temps réel
+        'prix actuel', 'cours actuel', 'combien coûte',
+        'météo', 'température', 'quel temps',
+        'score', 'résultat match', 'qui a gagné',
+        // Anglais - demandes explicites
+        'search', 'find', 'look up', 'check', 'tell me about',
+        'what\'s the latest', 'breaking news', 'current price',
+        'weather', 'score', 'result',
         // Italien
-        'notizie', 'recente', 'oggi', 'ieri', 'attuale', 'prezzo',
-        'meteo', 'punteggio', 'risultato', 'ultime',
+        'cerca', 'trova', 'dimmi', 'ultime notizie',
+        'prezzo attuale', 'meteo', 'risultato',
         // Espagnol
-        'noticias', 'reciente', 'hoy', 'ayer', 'actual', 'precio',
-        'clima', 'resultado', 'últimas',
-        // Arabe (translitération)
-        'akhbar', 'jadid', 'alyawm'
+        'busca', 'encuentra', 'dime', 'últimas noticias',
+        'precio actual', 'clima', 'resultado'
     ];
     
     $msgLower = mb_strtolower($msg);
-    foreach ($keywords as $kw) {
+    
+    // Vérifier les demandes explicites de recherche
+    foreach ($searchKeywords as $kw) {
         if (strpos($msgLower, $kw) !== false) {
             return true;
         }
     }
+    
+    // Questions qui nécessitent des infos actuelles (formulations de questions)
+    $questionPatterns = [
+        'quel est le prix',
+        'quelle est la météo',
+        'quel temps fait',
+        'qui a gagné',
+        'what is the price',
+        'what\'s the weather',
+        'who won',
+        'qual è il prezzo',
+        'che tempo fa',
+        'cuál es el precio',
+        'qué tiempo hace'
+    ];
+    
+    foreach ($questionPatterns as $pattern) {
+        if (strpos($msgLower, $pattern) !== false) {
+            return true;
+        }
+    }
+    
     return false;
 }
 
@@ -517,15 +553,15 @@ body {
     <div class="row g-3">
         <div class="col-12 col-lg-8">
             <div class="panel">
-                <div class="panel-header">💬 JARVIS AI - Recherche Web Intelligente</div>
+                <div class="panel-header">💬 JARVIS AI - Assistant Intelligent</div>
                 <div id="chatWindow">
                     <div class="msg-jarvis">
-                        👋 Bonjour ! Je suis JARVIS. Je peux rechercher des informations actuelles sur Internet et ouvrir des liens pour vous. Posez-moi n'importe quelle question !
+                        👋 Bonjour ! Je suis JARVIS, votre assistant virtuel. Je peux discuter avec vous naturellement et faire des recherches sur Internet quand vous me le demandez. Comment puis-je vous aider ?
                     </div>
                 </div>
                 <form id="chatForm">
                     <div class="mb-3">
-                        <input type="text" id="messageInput" class="form-control" placeholder="Posez votre question (ex: actualités IA, météo Paris, prix Bitcoin)..." required autocomplete="off">
+                        <input type="text" id="messageInput" class="form-control" placeholder="Parlez-moi naturellement ou demandez une recherche..." required autocomplete="off">
                     </div>
                     <div class="row g-2 align-items-center">
                         <div class="col-12 col-sm-7 col-md-5">
@@ -565,13 +601,16 @@ body {
                 </div>
                 <hr style="border-color: var(--border-color); margin: 15px 0;">
                 <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
-                    <strong style="color: var(--accent);">💡 Exemples:</strong><br>
-                    • "Actualités sur l'IA"<br>
-                    • "Météo à Paris"<br>
-                    • "Prix du Bitcoin"<br>
-                    • "Ouvre le premier lien"<br>
-                    • "Open the second link"<br>
-                    • "Apri il terzo link"
+                    <strong style="color: var(--accent);">💬 Dialogue naturel:</strong><br>
+                    • "Bonjour, comment ça va?"<br>
+                    • "Qu'est-ce que l'IA?"<br>
+                    • "Raconte-moi une blague"<br>
+                    <br>
+                    <strong style="color: var(--accent);">🔍 Recherche web:</strong><br>
+                    • "Recherche actualités IA"<br>
+                    • "Trouve météo Paris"<br>
+                    • "Prix du Bitcoin actuel"<br>
+                    • "Ouvre le premier lien"
                 </div>
             </div>
         </div>
@@ -711,7 +750,7 @@ document.getElementById('chatForm').onsubmit = async (e) => {
     // Thinking
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'msg-thinking';
-    thinkingDiv.innerHTML = '🔍 JARVIS recherche sur le web<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+    thinkingDiv.innerHTML = '🤔 JARVIS réfléchit<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
     chatWindow.appendChild(thinkingDiv);
     
     chatWindow.scrollTop = chatWindow.scrollHeight;
