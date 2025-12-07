@@ -63,7 +63,8 @@ function googleSearch($query, $num = 5) {
     
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -173,17 +174,15 @@ if (isset($_POST['ajax'])) {
         $foundLinks = [];
         
         if (needsWebSearch($userMessage)) {
-            $searchData = googleSearch($userMessage, 8);
+            $searchData = googleSearch($userMessage, 5);
             
             if ($searchData['success']) {
-                $searchContext = "\n\n**RÉSULTATS DE RECHERCHE GOOGLE (ACTUALISÉS):**\n";
+                $searchContext = "\n\n**RÉSULTATS GOOGLE:**\n";
                 
                 foreach ($searchData['results'] as $i => $r) {
-                    $searchContext .= "\n**Résultat " . ($i + 1) . ":**\n";
-                    $searchContext .= "Titre: " . $r['title'] . "\n";
+                    $searchContext .= "\n" . ($i + 1) . ". " . $r['title'] . "\n";
                     $searchContext .= "URL: " . $r['link'] . "\n";
-                    $searchContext .= "Description: " . $r['snippet'] . "\n";
-                    $searchContext .= "---\n";
+                    $searchContext .= substr($r['snippet'], 0, 150) . "...\n";
                     
                     $foundLinks[] = [
                         'position' => $i + 1,
@@ -192,7 +191,7 @@ if (isset($_POST['ajax'])) {
                     ];
                 }
                 
-                $searchContext .= "\n**INSTRUCTIONS:** Utilise ces résultats actualisés pour répondre. Mentionne les sources pertinentes. Si l'utilisateur te demande d'ouvrir un lien (dans n'importe quelle langue), utilise [BROWSER:OPEN:URL] avec l'URL correspondante.\n";
+                $searchContext .= "\n**Utilise ces résultats pour répondre.**\n";
                 $response["links"] = $foundLinks;
             }
         }
@@ -221,21 +220,30 @@ if (isset($_POST['ajax'])) {
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POSTFIELDS => json_encode([
                     "model" => "c4ai-aya-expanse-32b",
-                    "messages" => $messages
+                    "messages" => $messages,
+                    "max_tokens" => 500,
+                    "temperature" => 0.7
                 ]),
-                CURLOPT_TIMEOUT => 30
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_CONNECTTIMEOUT => 5
             ]);
             
             $raw = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            $data = json_decode($raw, true);
             
-            if (isset($data["message"]["content"][0]["text"])) {
-                $response["message"] = $data["message"]["content"][0]["text"];
-                $response["success"] = true;
-            } elseif (isset($data["text"])) {
-                $response["message"] = $data["text"];
-                $response["success"] = true;
+            if ($httpCode === 200) {
+                $data = json_decode($raw, true);
+                
+                if (isset($data["message"]["content"][0]["text"])) {
+                    $response["message"] = $data["message"]["content"][0]["text"];
+                    $response["success"] = true;
+                } elseif (isset($data["text"])) {
+                    $response["message"] = $data["text"];
+                    $response["success"] = true;
+                }
+            } else {
+                $response["message"] = "❌ Erreur API (Code: $httpCode)";
             }
         } else if ($model === "cosmosrp") {
             $ch = curl_init("https://api.pawan.krd/cosmosrp/v1/chat/completions");
@@ -245,18 +253,27 @@ if (isset($_POST['ajax'])) {
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POSTFIELDS => json_encode([
                     "model" => "cosmosrp",
-                    "messages" => $messages
+                    "messages" => $messages,
+                    "max_tokens" => 500,
+                    "temperature" => 0.7
                 ]),
-                CURLOPT_TIMEOUT => 30
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_CONNECTTIMEOUT => 5
             ]);
             
             $raw = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            $data = json_decode($raw, true);
             
-            if (isset($data["choices"][0]["message"]["content"])) {
-                $response["message"] = $data["choices"][0]["message"]["content"];
-                $response["success"] = true;
+            if ($httpCode === 200) {
+                $data = json_decode($raw, true);
+                
+                if (isset($data["choices"][0]["message"]["content"])) {
+                    $response["message"] = $data["choices"][0]["message"]["content"];
+                    $response["success"] = true;
+                }
+            } else {
+                $response["message"] = "❌ Erreur API CosmosRP (Code: $httpCode)";
             }
         }
         
@@ -671,8 +688,8 @@ document.getElementById('voiceBtn').onclick = () => {
     }
 };
 
-// ANIMATION DACTYLOGRAPHIQUE
-function typeWriter(text, element, speed = 25) {
+// ANIMATION DACTYLOGRAPHIQUE (PLUS RAPIDE)
+function typeWriter(text, element, speed = 15) {
     let index = 0;
     element.innerHTML = '';
     
@@ -694,7 +711,7 @@ function typeWriter(text, element, speed = 25) {
                 const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
                 responsiveVoice.speak(cleanText, "French Male", {
                     pitch: 1,
-                    rate: 0.95,
+                    rate: 1.0,
                     volume: 1
                 });
             }
@@ -820,9 +837,9 @@ document.getElementById('chatForm').onsubmit = async (e) => {
                 content: displayMessage
             });
             
-            // Limiter historique à 10 messages
-            if (conversationHistory.length > 20) {
-                conversationHistory = conversationHistory.slice(-20);
+            // Limiter historique à 6 messages (3 échanges)
+            if (conversationHistory.length > 12) {
+                conversationHistory = conversationHistory.slice(-12);
             }
             
             typeWriter(displayMessage, typingSpan);
