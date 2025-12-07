@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// JARVIS AI - GIF FIXE + ANIMATION DACTYLOGRAPHIQUE
+// JARVIS AI - RECHERCHE GOOGLE AUTOMATIQUE + OUVERTURE LIENS
 // =====================================================
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
@@ -8,23 +8,55 @@ error_reporting(E_ALL);
 define('GOOGLE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
 define('SEARCH_ENGINE_ID', '511c9c9b776d246e4');
 
-$JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, créé par Pepe Musafiri. Tu maîtrises toutes les langues et tous les domaines. Tu peux contrôler le navigateur avec [BROWSER:ACTION:PARAM].";
+$JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, créé par Pepe Musafiri, un assistant virtuel ultra-intelligent.
+
+**TES CAPACITÉS:**
+- Tu maîtrises TOUTES les langues (français, anglais, italien, espagnol, arabe, chinois, etc.)
+- Tu as accès à Google Search pour trouver des informations actuelles sur TOUT
+- Tu DOIS faire des recherches web pour TOUTES les questions sur l'actualité, événements récents, prix, météo, scores, news
+- Tu peux ouvrir automatiquement des liens web trouvés sur Google
+
+**INSTRUCTIONS IMPORTANTES:**
+1. Quand l'utilisateur pose une question sur l'actualité ou demande des informations récentes, tu DOIS utiliser les résultats Google fournis
+2. Quand l'utilisateur te demande d'ouvrir un lien ou d'aller sur un site (dans N'IMPORTE QUELLE langue), réponds avec la commande [BROWSER:OPEN:URL]
+3. Si tu trouves des liens pertinents dans les résultats Google, propose-les à l'utilisateur
+4. Quand l'utilisateur dit 'ouvre le lien', 'ouvre le premier lien', 'ouvre ce site', 'va sur ce site', etc., tu dois ouvrir l'URL correspondante
+
+**EXEMPLES:**
+- User: 'Quelles sont les dernières actualités sur l'IA?'
+  Tu: [Utilise les résultats Google fournis et cite les sources avec leurs liens]
+  
+- User: 'Ouvre le premier lien' ou 'Va sur le premier site'
+  Tu: 'D'accord, j'ouvre le site pour vous. [BROWSER:OPEN:https://example.com]'
+
+- User: 'Apri il primo link' (italien)
+  Tu: 'Certamente, apro il sito. [BROWSER:OPEN:https://example.com]'
+
+- User: 'Open the link' (anglais)
+  Tu: 'Opening the website now. [BROWSER:OPEN:https://example.com]'
+
+**IMPORTANT:** Garde toujours en mémoire les liens trouvés dans les résultats Google pour pouvoir les ouvrir quand l'utilisateur te le demande.";
 
 function wantsTime($msg) {
-    return preg_match('/(heure|time|quelle heure)/i', $msg);
+    return preg_match('/(heure|time|quelle heure|hora|che ora)/i', $msg);
 }
 
 function wantsDate($msg) {
-    return preg_match('/(date|jour|quel jour|aujourd\'hui)/i', $msg);
+    return preg_match('/(date|jour|quel jour|oggi|today|fecha)/i', $msg);
 }
 
 function googleSearch($query, $num = 5) {
     $url = "https://www.googleapis.com/customsearch/v1?" . http_build_query([
-        'key' => GOOGLE_API_KEY, 'cx' => SEARCH_ENGINE_ID, 'q' => $query, 'num' => $num
+        'key' => GOOGLE_API_KEY, 
+        'cx' => SEARCH_ENGINE_ID, 
+        'q' => $query, 
+        'num' => $num
     ]);
+    
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
@@ -34,7 +66,11 @@ function googleSearch($query, $num = 5) {
         if (isset($data['items'])) {
             $results = [];
             foreach ($data['items'] as $item) {
-                $results[] = ['title' => $item['title'] ?? '', 'link' => $item['link'] ?? '', 'snippet' => $item['snippet'] ?? ''];
+                $results[] = [
+                    'title' => $item['title'] ?? '',
+                    'link' => $item['link'] ?? '',
+                    'snippet' => $item['snippet'] ?? ''
+                ];
             }
             return ['success' => true, 'results' => $results];
         }
@@ -43,54 +79,113 @@ function googleSearch($query, $num = 5) {
 }
 
 function needsWebSearch($msg) {
-    return preg_match('/(actualité|news|récent|2024|2025|prix|météo|score)/i', $msg);
+    $keywords = [
+        // Français
+        'actualité', 'news', 'récent', 'dernière', 'dernier', 'aujourd\'hui', 
+        'hier', 'cette semaine', 'ce mois', 'nouveau', 'nouvelle',
+        'prix', 'coût', 'cours', 'météo', 'temps', 'température',
+        'score', 'résultat', 'match', 'gagné', 'perdu',
+        'info', 'infos', 'dernières nouvelles', 'breaking news',
+        '2024', '2025', 'maintenant', 'actuellement', 'en ce moment',
+        'qui a gagné', 'qui est', 'combien coûte',
+        // Anglais
+        'latest', 'recent', 'current', 'today', 'yesterday', 'now',
+        'price', 'cost', 'weather', 'score', 'result', 'who won',
+        'breaking', 'update', 'currently',
+        // Italien
+        'notizie', 'recente', 'oggi', 'ieri', 'attuale', 'prezzo',
+        'meteo', 'punteggio', 'risultato', 'ultime',
+        // Espagnol
+        'noticias', 'reciente', 'hoy', 'ayer', 'actual', 'precio',
+        'clima', 'resultado', 'últimas',
+        // Arabe (translitération)
+        'akhbar', 'jadid', 'alyawm'
+    ];
+    
+    $msgLower = mb_strtolower($msg);
+    foreach ($keywords as $kw) {
+        if (strpos($msgLower, $kw) !== false) {
+            return true;
+        }
+    }
+    return false;
 }
 
 if (isset($_POST['ajax'])) {
     header('Content-Type: application/json; charset=utf-8');
     $model = $_POST['model'] ?? "c4ai";
     $userMessage = trim($_POST['message'] ?? "");
-    $response = ["success" => false, "message" => "", "browserCommand" => null];
+    $conversationHistory = json_decode($_POST['history'] ?? '[]', true);
+    $response = ["success" => false, "message" => "", "browserCommand" => null, "links" => []];
     
     if ($userMessage) {
         date_default_timezone_set('Europe/Brussels');
         
         if (wantsTime($userMessage)) {
-            echo json_encode(["success" => true, "message" => "⏰ Il est " . date("H:i:s")]);
+            echo json_encode(["success" => true, "message" => "⏰ Il est " . date("H:i:s"), "links" => []]);
             exit;
         }
         
         if (wantsDate($userMessage)) {
             $jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-            echo json_encode(["success" => true, "message" => "📅 " . $jours[date("w")] . " " . date("d/m/Y")]);
+            echo json_encode(["success" => true, "message" => "📅 " . $jours[date("w")] . " " . date("d/m/Y"), "links" => []]);
             exit;
         }
         
+        // Recherche Google automatique
         $searchContext = "";
+        $foundLinks = [];
+        
         if (needsWebSearch($userMessage)) {
-            $searchData = googleSearch($userMessage);
+            $searchData = googleSearch($userMessage, 8);
+            
             if ($searchData['success']) {
-                $searchContext = "\n\nRÉSULTATS GOOGLE:\n";
+                $searchContext = "\n\n**RÉSULTATS DE RECHERCHE GOOGLE (ACTUALISÉS):**\n";
+                
                 foreach ($searchData['results'] as $i => $r) {
-                    $searchContext .= "\nSource " . ($i+1) . ": " . $r['title'] . "\n" . $r['snippet'] . "\n";
+                    $searchContext .= "\n**Résultat " . ($i + 1) . ":**\n";
+                    $searchContext .= "Titre: " . $r['title'] . "\n";
+                    $searchContext .= "URL: " . $r['link'] . "\n";
+                    $searchContext .= "Description: " . $r['snippet'] . "\n";
+                    $searchContext .= "---\n";
+                    
+                    $foundLinks[] = [
+                        'position' => $i + 1,
+                        'title' => $r['title'],
+                        'url' => $r['link']
+                    ];
                 }
+                
+                $searchContext .= "\n**INSTRUCTIONS:** Utilise ces résultats actualisés pour répondre. Mentionne les sources pertinentes. Si l'utilisateur te demande d'ouvrir un lien (dans n'importe quelle langue), utilise [BROWSER:OPEN:URL] avec l'URL correspondante.\n";
+                $response["links"] = $foundLinks;
             }
         }
         
-        $enhancedMessage = $userMessage . $searchContext;
+        // Construire historique de conversation
+        $messages = [["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT]];
         
+        // Ajouter l'historique
+        foreach ($conversationHistory as $msg) {
+            $messages[] = $msg;
+        }
+        
+        // Ajouter le message actuel avec contexte
+        $enhancedMessage = $userMessage . $searchContext;
+        $messages[] = ["role" => "user", "content" => $enhancedMessage];
+        
+        // Appel API
         if ($model === "c4ai") {
             $ch = curl_init("https://api.cohere.com/v2/chat");
             curl_setopt_array($ch, [
                 CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => ["Content-Type: application/json", "Authorization: Bearer Uw540GN865rNyiOs3VMnWhRaYQ97KAfudAHAnXzJ"],
+                CURLOPT_HTTPHEADER => [
+                    "Content-Type: application/json", 
+                    "Authorization: Bearer Uw540GN865rNyiOs3VMnWhRaYQ97KAfudAHAnXzJ"
+                ],
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POSTFIELDS => json_encode([
                     "model" => "c4ai-aya-expanse-32b",
-                    "messages" => [
-                        ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
-                        ["role" => "user", "content" => $enhancedMessage]
-                    ]
+                    "messages" => $messages
                 ]),
                 CURLOPT_TIMEOUT => 30
             ]);
@@ -102,9 +197,6 @@ if (isset($_POST['ajax'])) {
             if (isset($data["message"]["content"][0]["text"])) {
                 $response["message"] = $data["message"]["content"][0]["text"];
                 $response["success"] = true;
-                if (preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $m)) {
-                    $response["browserCommand"] = ["action" => $m[1], "param" => $m[2]];
-                }
             } elseif (isset($data["text"])) {
                 $response["message"] = $data["text"];
                 $response["success"] = true;
@@ -117,10 +209,7 @@ if (isset($_POST['ajax'])) {
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POSTFIELDS => json_encode([
                     "model" => "cosmosrp",
-                    "messages" => [
-                        ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
-                        ["role" => "user", "content" => $enhancedMessage]
-                    ]
+                    "messages" => $messages
                 ]),
                 CURLOPT_TIMEOUT => 30
             ]);
@@ -132,10 +221,15 @@ if (isset($_POST['ajax'])) {
             if (isset($data["choices"][0]["message"]["content"])) {
                 $response["message"] = $data["choices"][0]["message"]["content"];
                 $response["success"] = true;
-                if (preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $m)) {
-                    $response["browserCommand"] = ["action" => $m[1], "param" => $m[2]];
-                }
             }
+        }
+        
+        // Détecter commandes navigateur
+        if ($response["success"] && preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $m)) {
+            $response["browserCommand"] = [
+                "action" => $m[1],
+                "param" => $m[2]
+            ];
         }
     }
     
@@ -148,7 +242,7 @@ if (isset($_POST['ajax'])) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS AI - GIF Fixe + Animation</title>
+<title>JARVIS AI - Recherche Web Intelligente</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -169,7 +263,6 @@ body {
     padding-top: 320px;
 }
 
-/* GIF FIXE */
 .jarvis-visual {
     position: fixed;
     top: 0;
@@ -266,7 +359,32 @@ body {
     color: #ffcc00;
 }
 
-/* ANIMATION TYPING */
+.link-button {
+    display: inline-block;
+    background: rgba(0, 234, 255, 0.2);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 8px 15px;
+    margin: 5px 5px 5px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.link-button:hover {
+    background: rgba(0, 234, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 234, 255, 0.4);
+}
+
+.links-container {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0, 234, 255, 0.2);
+}
+
 .typing-cursor {
     display: inline-block;
     width: 2px;
@@ -296,9 +414,7 @@ body {
     50% { transform: scale(1.05); }
 }
 
-.dots span {
-    animation: dotPulse 1.5s infinite;
-}
+.dots span { animation: dotPulse 1.5s infinite; }
 .dots span:nth-child(2) { animation-delay: 0.3s; }
 .dots span:nth-child(3) { animation-delay: 0.6s; }
 
@@ -401,13 +517,15 @@ body {
     <div class="row g-3">
         <div class="col-12 col-lg-8">
             <div class="panel">
-                <div class="panel-header">💬 JARVIS AI CHAT</div>
+                <div class="panel-header">💬 JARVIS AI - Recherche Web Intelligente</div>
                 <div id="chatWindow">
-                    <div class="msg-jarvis">👋 Bonjour, je suis JARVIS. Comment puis-je vous aider ?</div>
+                    <div class="msg-jarvis">
+                        👋 Bonjour ! Je suis JARVIS. Je peux rechercher des informations actuelles sur Internet et ouvrir des liens pour vous. Posez-moi n'importe quelle question !
+                    </div>
                 </div>
                 <form id="chatForm">
                     <div class="mb-3">
-                        <input type="text" id="messageInput" class="form-control" placeholder="Tapez votre message..." required autocomplete="off">
+                        <input type="text" id="messageInput" class="form-control" placeholder="Posez votre question (ex: actualités IA, météo Paris, prix Bitcoin)..." required autocomplete="off">
                     </div>
                     <div class="row g-2 align-items-center">
                         <div class="col-12 col-sm-7 col-md-5">
@@ -434,20 +552,26 @@ body {
                     <span class="status-value">🟢 En ligne</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">Modèle actuel</span>
-                    <span class="status-value" id="currentModel">C4AI Aya Expanse 32B</span>
+                    <span class="status-label">Recherche Google</span>
+                    <span class="status-value">✅ Active</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">GIF JARVIS</span>
-                    <span class="status-value">📌 Position fixe</span>
+                    <span class="status-label">Ouverture liens</span>
+                    <span class="status-value">🌐 Automatique</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">Animation</span>
-                    <span class="status-value">✍️ Dactylographique</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Messages envoyés</span>
+                    <span class="status-label">Messages</span>
                     <span class="status-value" id="msgCount">0</span>
+                </div>
+                <hr style="border-color: var(--border-color); margin: 15px 0;">
+                <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
+                    <strong style="color: var(--accent);">💡 Exemples:</strong><br>
+                    • "Actualités sur l'IA"<br>
+                    • "Météo à Paris"<br>
+                    • "Prix du Bitcoin"<br>
+                    • "Ouvre le premier lien"<br>
+                    • "Open the second link"<br>
+                    • "Apri il terzo link"
                 </div>
             </div>
         </div>
@@ -459,6 +583,8 @@ body {
 let messageCount = 0;
 let recognition = null;
 let isListening = false;
+let conversationHistory = [];
+let currentLinks = [];
 
 // RECONNAISSANCE VOCALE
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -484,9 +610,6 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognition.onerror = (event) => {
         isListening = false;
         document.getElementById('voiceBtn').classList.remove('listening');
-        if (event.error === 'not-allowed') {
-            alert('🎤 Permission microphone refusée.');
-        }
     };
 }
 
@@ -509,8 +632,8 @@ document.getElementById('voiceBtn').onclick = () => {
     }
 };
 
-// FONCTION ANIMATION DACTYLOGRAPHIQUE
-function typeWriter(text, element, speed = 30) {
+// ANIMATION DACTYLOGRAPHIQUE
+function typeWriter(text, element, speed = 25) {
     let index = 0;
     element.innerHTML = '';
     
@@ -524,15 +647,10 @@ function typeWriter(text, element, speed = 30) {
             element.textContent += text.charAt(index);
             element.appendChild(cursor);
             index++;
-            
-            // Scroll automatique
             element.parentElement.parentElement.scrollTop = element.parentElement.parentElement.scrollHeight;
-            
             setTimeout(type, speed);
         } else {
             cursor.remove();
-            
-            // Synthèse vocale après typing
             if (typeof responsiveVoice !== 'undefined') {
                 const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
                 responsiveVoice.speak(cleanText, "French Male", {
@@ -543,8 +661,19 @@ function typeWriter(text, element, speed = 30) {
             }
         }
     }
-    
     type();
+}
+
+// OUVRIR LIEN
+function openLink(url, title) {
+    window.open(url, '_blank');
+    
+    const chatWindow = document.getElementById('chatWindow');
+    const notifDiv = document.createElement('div');
+    notifDiv.className = 'msg-jarvis';
+    notifDiv.innerHTML = `🌐 <strong>Ouverture du site:</strong><br>${title}`;
+    chatWindow.appendChild(notifDiv);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
 // SOUMISSION FORMULAIRE
@@ -561,28 +690,32 @@ document.getElementById('chatForm').onsubmit = async (e) => {
     
     if (!userMessage) return;
     
-    // Désactiver bouton
     sendBtn.disabled = true;
     sendBtn.textContent = '⏳ Envoi...';
     
     messageCount++;
     document.getElementById('msgCount').textContent = messageCount;
     
-    // Afficher message utilisateur
+    // Message utilisateur
     const userMsgDiv = document.createElement('div');
     userMsgDiv.className = 'msg-user';
     userMsgDiv.textContent = userMessage;
     chatWindow.appendChild(userMsgDiv);
     
-    // Afficher "JARVIS thinking..."
+    // Ajouter à l'historique
+    conversationHistory.push({
+        role: "user",
+        content: userMessage
+    });
+    
+    // Thinking
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'msg-thinking';
-    thinkingDiv.innerHTML = '🤔 JARVIS thinking<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+    thinkingDiv.innerHTML = '🔍 JARVIS recherche sur le web<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
     chatWindow.appendChild(thinkingDiv);
     
     chatWindow.scrollTop = chatWindow.scrollHeight;
     
-    // Mettre à jour modèle
     const modelNames = {
         'c4ai': 'C4AI Aya Expanse 32B',
         'cosmosrp': 'CosmosRP'
@@ -595,6 +728,7 @@ document.getElementById('chatForm').onsubmit = async (e) => {
         const formData = new FormData();
         formData.append('message', userMessage);
         formData.append('model', selectedModel);
+        formData.append('history', JSON.stringify(conversationHistory));
         formData.append('ajax', 'true');
         
         const response = await fetch(window.location.href, {
@@ -604,28 +738,61 @@ document.getElementById('chatForm').onsubmit = async (e) => {
         
         const data = await response.json();
         
-        // Retirer "thinking"
         thinkingDiv.remove();
         
         if (data.success) {
-            // Créer div JARVIS avec animation
+            // Sauvegarder liens trouvés
+            if (data.links && data.links.length > 0) {
+                currentLinks = data.links;
+            }
+            
             const jarvisMsgDiv = document.createElement('div');
             jarvisMsgDiv.className = 'msg-jarvis';
             const typingSpan = document.createElement('span');
             jarvisMsgDiv.appendChild(typingSpan);
+            
+            // Ajouter boutons de liens si disponibles
+            if (data.links && data.links.length > 0) {
+                const linksDiv = document.createElement('div');
+                linksDiv.className = 'links-container';
+                
+                data.links.forEach((link, idx) => {
+                    const linkBtn = document.createElement('a');
+                    linkBtn.className = 'link-button';
+                    linkBtn.href = '#';
+                    linkBtn.textContent = `🔗 ${link.position}. ${link.title.substring(0, 40)}...`;
+                    linkBtn.onclick = (e) => {
+                        e.preventDefault();
+                        openLink(link.url, link.title);
+                    };
+                    linksDiv.appendChild(linkBtn);
+                });
+                
+                jarvisMsgDiv.appendChild(linksDiv);
+            }
+            
             chatWindow.appendChild(jarvisMsgDiv);
             
-            // Nettoyer message des commandes navigateur
             const displayMessage = data.message.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
             
-            // Lancer animation dactylographique
+            // Ajouter à l'historique
+            conversationHistory.push({
+                role: "assistant",
+                content: displayMessage
+            });
+            
+            // Limiter historique à 10 messages
+            if (conversationHistory.length > 20) {
+                conversationHistory = conversationHistory.slice(-20);
+            }
+            
             typeWriter(displayMessage, typingSpan);
             
-            // Exécuter commandes navigateur si présentes
+            // Exécuter commande navigateur
             if (data.browserCommand) {
                 setTimeout(() => {
                     executeBrowserCommand(data.browserCommand);
-                }, 1000);
+                }, 1500);
             }
         } else {
             const errorDiv = document.createElement('div');
@@ -655,20 +822,22 @@ function executeBrowserCommand(command) {
     
     if (action === 'OPEN') {
         window.open(param, '_blank');
-        alert(`✅ Page ouverte: ${param}`);
+        
+        const chatWindow = document.getElementById('chatWindow');
+        const notifDiv = document.createElement('div');
+        notifDiv.className = 'msg-jarvis';
+        notifDiv.innerHTML = `✅ <strong>Page ouverte:</strong><br><a href="${param}" target="_blank" style="color: var(--accent);">${param}</a>`;
+        chatWindow.appendChild(notifDiv);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
     } else if (action === 'SEARCH') {
         const searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(param);
         window.open(searchUrl, '_blank');
-        alert(`🔍 Recherche: ${param}`);
-    } else if (action === 'CLOSE') {
-        alert('ℹ️ Commande CLOSE reçue');
     }
 }
 
-// Focus automatique
 document.getElementById('messageInput').focus();
 
-console.log('🚀 JARVIS AI avec animation dactylographique initialisé !');
+console.log('🚀 JARVIS AI avec recherche web intelligente initialisé !');
 </script>
 </body>
 </html>
