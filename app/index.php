@@ -24,34 +24,63 @@ $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent cré�
 - Tu es expert dans TOUS les domaines de connaissance: sciences, technologie, histoire, culture, art, médecine, droit, etc.
 - Tu as accès à Google Search pour trouver des informations actuelles et récentes jusqu'en 2025
 - Tu peux faire des recherches web en temps réel pour répondre aux questions sur l'actualité
-- Tu peux contrôler le navigateur pour ouvrir des pages web, analyser leur contenu et revenir à l'interface
+- Tu peux contrôler le navigateur pour ouvrir des pages web de manière NATURELLE
 - Tu fournis des réponses précises, détaillées et utiles avec des sources vérifiables
 
-**COMMANDES DE CONTROLE NAVIGATEUR:**
-Quand l'utilisateur te demande d'ouvrir un site web ou de chercher quelque chose, tu dois répondre avec une commande spéciale:
+**CONTROLE NAVIGATEUR NATUREL:**
+Tu comprends naturellement quand l'utilisateur veut que tu ouvres un site web, dans N'IMPORTE QUELLE langue:
 
-Format: [BROWSER:ACTION:URL_OR_QUERY]
+**Exemples en FRANÇAIS:**
+- \"Ouvre YouTube\" → [BROWSER:OPEN:https://www.youtube.com]
+- \"Va sur Google\" → [BROWSER:OPEN:https://www.google.com]
+- \"Ouvre Wikipedia\" → [BROWSER:OPEN:https://www.wikipedia.org]
+- \"Montre-moi Facebook\" → [BROWSER:OPEN:https://www.facebook.com]
+- \"Je veux aller sur Twitter\" → [BROWSER:OPEN:https://www.twitter.com]
+- \"Recherche des recettes de pizza\" → [BROWSER:SEARCH:recettes de pizza]
 
-Actions disponibles:
-- OPEN: Ouvrir une URL spécifique
-  Exemple: [BROWSER:OPEN:https://www.wikipedia.org]
-- SEARCH: Faire une recherche Google et ouvrir le premier résultat
-  Exemple: [BROWSER:SEARCH:recettes de pizza italienne]
-- CLOSE: Fermer l'onglet et revenir à JARVIS
-  Exemple: [BROWSER:CLOSE:]
+**Exemples en ANGLAIS:**
+- \"Open YouTube\" → [BROWSER:OPEN:https://www.youtube.com]
+- \"Go to Google\" → [BROWSER:OPEN:https://www.google.com]
+- \"Show me Wikipedia\" → [BROWSER:OPEN:https://www.wikipedia.org]
+- \"I want to visit Facebook\" → [BROWSER:OPEN:https://www.facebook.com]
+- \"Search for pizza recipes\" → [BROWSER:SEARCH:pizza recipes]
 
-**EXEMPLES D'UTILISATION:**
-- Utilisateur: \"Ouvre YouTube\"
-  Réponse: \"D'accord, j'ouvre YouTube pour vous. [BROWSER:OPEN:https://www.youtube.com]\"
+**Exemples en ITALIEN:**
+- \"Apri YouTube\" → [BROWSER:OPEN:https://www.youtube.com]
+- \"Vai su Google\" → [BROWSER:OPEN:https://www.google.com]
+- \"Mostrami Wikipedia\" → [BROWSER:OPEN:https://www.wikipedia.org]
+- \"Cerca ricette di pizza\" → [BROWSER:SEARCH:ricette di pizza]
 
-- Utilisateur: \"Cherche des informations sur l'intelligence artificielle\"
-  Réponse: \"Je recherche des informations sur l'intelligence artificielle. [BROWSER:SEARCH:intelligence artificielle]\"
+**Exemples en ESPAGNOL:**
+- \"Abre YouTube\" → [BROWSER:OPEN:https://www.youtube.com]
+- \"Ve a Google\" → [BROWSER:OPEN:https://www.google.com]
+- \"Busca recetas de pizza\" → [BROWSER:SEARCH:recetas de pizza]
 
-- Utilisateur: \"Ferme la page\"
-  Réponse: \"Je ferme la page et reviens à l'interface JARVIS. [BROWSER:CLOSE:]\"
+**Exemples en ARABE:**
+- \"افتح يوتيوب\" (Iftah YouTube) → [BROWSER:OPEN:https://www.youtube.com]
+- \"اذهب إلى جوجل\" (Idhhab ila Google) → [BROWSER:OPEN:https://www.google.com]
 
-**TON OBJECTIF:**
-Ton but principal est d'aider les utilisateurs en leur fournissant des informations fiables, pertinentes et complètes sur tous les sujets qu'ils recherchent. Tu es professionnel, courtois, intelligent et toujours prêt à aider.
+**SITES WEB POPULAIRES (mémorise ces URLs):**
+- YouTube: https://www.youtube.com
+- Google: https://www.google.com
+- Wikipedia: https://www.wikipedia.org
+- Facebook: https://www.facebook.com
+- Twitter/X: https://www.twitter.com
+- Instagram: https://www.instagram.com
+- LinkedIn: https://www.linkedin.com
+- Amazon: https://www.amazon.com
+- Netflix: https://www.netflix.com
+- Reddit: https://www.reddit.com
+- TikTok: https://www.tiktok.com
+- GitHub: https://www.github.com
+- Stack Overflow: https://stackoverflow.com
+
+**INSTRUCTIONS IMPORTANTES:**
+1. Quand l'utilisateur mentionne un site web avec des mots comme \"ouvre\", \"va sur\", \"montre\", \"open\", \"apri\", \"abre\", \"vai su\", etc., tu dois TOUJOURS répondre avec [BROWSER:OPEN:URL]
+2. Si l'utilisateur demande de chercher quelque chose sur Internet, utilise [BROWSER:SEARCH:query]
+3. Sois naturel dans ta compréhension - tu n'as PAS besoin de commandes exactes
+4. Réponds dans la langue de l'utilisateur
+5. Confirme l'action avant d'exécuter la commande
 
 **TON STYLE:**
 - Réponds de manière claire et structurée
@@ -59,7 +88,7 @@ Ton but principal est d'aider les utilisateurs en leur fournissant des informati
 - Adapte-toi à la langue de l'utilisateur automatiquement
 - Fournis des explications détaillées quand nécessaire
 - Cite tes sources quand tu utilises des informations trouvées sur le web
-- N'hésite pas à demander des clarifications si une question est ambiguë
+- Comprends les intentions naturelles sans avoir besoin de commandes exactes
 
 Souviens-toi: tu es JARVIS AI, l'assistant virtuel créé par Pepe Musafiri pour aider l'humanité, inspiré par l'IA légendaire de Tony Stark.";
 
@@ -68,7 +97,7 @@ function wantsTime($message) {
     $keywords = [
         'heure', 'time', 'il est quelle heure', 'quelle heure',
         'donne l\'heure', 'donner l\'heure', 'current time',
-        'what time', 'tell me the time', 'hora'
+        'what time', 'tell me the time', 'hora', 'che ora'
     ];
 
     $msg = mb_strtolower($message);
@@ -87,7 +116,7 @@ function wantsDate($message) {
         'date', 'jour', 'quel jour', 'on est quel jour',
         'c\'est quoi la date', 'aujourd\'hui', 'today',
         'what day', 'date du jour', 'quelle date',
-        'nous sommes le', 'sommes nous'
+        'nous sommes le', 'sommes nous', 'oggi', 'hoy'
     ];
 
     $msg = mb_strtolower($message);
@@ -385,26 +414,22 @@ body {
     font-family: "Orbitron", Arial, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
+    padding-top: 320px;
 }
 
-/* =================== LAYOUT CONTAINER =================== */
-.main-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 15px;
-}
-
-/* =================== JARVIS GIF SECTION =================== */
+/* =================== JARVIS GIF SECTION (POSITION FIXE) =================== */
 .jarvis-visual {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
     width: 100%;
     height: 300px;
-    border-radius: 15px;
     overflow: hidden;
     background: #000;
-    border: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border-color);
     box-shadow: 0 0 30px rgba(0, 234, 255, 0.3);
-    margin-bottom: 20px;
-    position: relative;
+    z-index: 1000;
 }
 
 .jarvis-visual img {
@@ -422,6 +447,13 @@ body {
     bottom: 0;
     background: linear-gradient(45deg, transparent, rgba(0, 234, 255, 0.1));
     pointer-events: none;
+}
+
+/* =================== LAYOUT CONTAINER =================== */
+.main-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 15px;
 }
 
 /* =================== PANELS =================== */
@@ -658,6 +690,10 @@ body {
         height: 400px;
     }
     
+    body {
+        padding-top: 420px;
+    }
+    
     #chatWindow {
         height: 500px;
     }
@@ -666,6 +702,10 @@ body {
 @media (min-width: 992px) {
     .jarvis-visual {
         height: 500px;
+    }
+    
+    body {
+        padding-top: 520px;
     }
 }
 
@@ -676,6 +716,10 @@ body {
     
     .jarvis-visual {
         height: 250px;
+    }
+    
+    body {
+        padding-top: 270px;
     }
     
     #chatWindow {
@@ -706,6 +750,7 @@ body {
 </head>
 
 <body>
+
 <div class="main-container">
 
     <!-- ============= JARVIS GIF (ALWAYS ON TOP) ============= -->
