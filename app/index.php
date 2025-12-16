@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// JARVIS AI - GIF ANIMATO DURANTE RISPOSTA
+// JARVIS AI - GIF ANIMATO SOLO DURANTE RISPOSTA
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -252,7 +252,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS AI — GIF Animato Durante Risposta</title>
+<title>JARVIS AI — GIF Animato Solo Durante Risposta</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -275,7 +275,7 @@ body {
     padding-top: 320px;
 }
 
-/* GIF JARVIS - ANIMATO SOLO DURANTE RISPOSTA */
+/* GIF JARVIS - FERMO ALL'INIZIO, ANIMATO SOLO DURANTE RISPOSTA */
 .jarvis-visual {
     position: fixed;
     top: 0;
@@ -294,11 +294,12 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0.3;
+    opacity: 0;
     transition: opacity 0.5s ease;
+    /* IMMAGINE NASCOSTA DI DEFAULT */
 }
 
-/* GIF ANIMATO quando JARVIS sta rispondendo */
+/* GIF VISIBILE E ANIMATO quando JARVIS sta rispondendo */
 .jarvis-visual.active img {
     opacity: 1;
     filter: brightness(1.2);
@@ -310,6 +311,26 @@ body {
     top: 0; left: 0; right: 0; bottom: 0;
     background: linear-gradient(45deg, transparent, rgba(0, 234, 255, 0.1));
     pointer-events: none;
+}
+
+/* Testo "JARVIS IN ATTESA" visibile quando GIF è spento */
+.jarvis-visual::after {
+    content: 'JARVIS AI';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(0, 234, 255, 0.8);
+    opacity: 1;
+    transition: opacity 0.5s ease;
+    letter-spacing: 5px;
+}
+
+.jarvis-visual.active::after {
+    opacity: 0;
 }
 
 .main-container { max-width: 1400px; margin: 0 auto; padding: 15px; }
@@ -474,11 +495,13 @@ body {
     .jarvis-visual { height: 400px; }
     body { padding-top: 420px; }
     #chatWindow { height: 500px; }
+    .jarvis-visual::after { font-size: 4rem; }
 }
 
 @media (min-width: 992px) {
     .jarvis-visual { height: 500px; }
     body { padding-top: 520px; }
+    .jarvis-visual::after { font-size: 5rem; }
 }
 
 @media (max-width: 576px) {
@@ -486,12 +509,13 @@ body {
     body { padding-top: 270px; }
     #chatWindow { height: 350px; }
     .voice-btn { width: 60px; height: 60px; font-size: 1.5rem; }
+    .jarvis-visual::after { font-size: 2rem; letter-spacing: 3px; }
 }
 </style>
 </head>
 <body>
 
-<!-- GIF JARVIS - Si anima solo durante la risposta -->
+<!-- GIF JARVIS - FERMO all'inizio, si anima SOLO durante la risposta -->
 <div class="jarvis-visual" id="jarvisGif">
     <img src="jarvis.gif" alt="JARVIS Interface">
 </div>
@@ -536,7 +560,7 @@ body {
                 </div>
                 <div class="status-item">
                     <span class="status-label">GIF JARVIS</span>
-                    <span class="status-value" id="gifStatus">💤 En attesa</span>
+                    <span class="status-value" id="gifStatus">⚫ Fermo</span>
                 </div>
                 <div class="status-item">
                     <span class="status-label">Modèle actuel</span>
@@ -569,7 +593,7 @@ body {
                     • "Quelle heure est-il ?"<br>
                     <br>
                     <strong style="color: #ffaa00;">✨ Animation:</strong><br>
-                    Le GIF JARVIS s'anime uniquement pendant que JARVIS répond !
+                    Le GIF JARVIS est <strong>FERMO</strong> et s'anime UNIQUEMENT quand JARVIS réfléchit et répond !
                 </div>
             </div>
         </div>
@@ -579,8 +603,7 @@ body {
 <div id="browserNotification" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 10000; background: rgba(0, 234, 255, 0.95); color: #000; padding: 20px; border-radius: 15px; box-shadow: 0 5px 30px rgba(0, 234, 255, 0.5); max-width: 350px; font-family: 'Orbitron', Arial;">
     <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 10px;">🌐 JARVIS - Contrôle Navigateur</div>
     <div id="browserNotificationText" style="margin-bottom: 15px; line-height: 1.5;"></div>
-    <button onclick="closeBrowserNotification()" style="background: #000; color: var(--accent); border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; font-family: 'Orbitron', Arial;">✓ OK</button>
-</div>
+    <button onclick="closeBrowserNotification()" style="background: #000; color: var(--accent); border: none; padding: 10px 20px; border-radius: 8px
 
 <script src="https://code.responsivevoice.org/responsivevoice.js?key=A0SDeHMK"></script>
 <script>
