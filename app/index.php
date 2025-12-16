@@ -706,32 +706,66 @@ function closeBrowserNotification() {
     document.getElementById('browserNotification').style.display = 'none';
 }
 
-// ANIMATION TYPING
+// ===============================
+// ANIMATION TYPING + VOIX SYNCHRO
+// ===============================
 function typeWriter(text, element) {
     let index = 0;
     element.classList.add('typing');
-    
-    // ATTIVA GIF quando inizia a scrivere
+
+    // Nettoyage texte pour la voix
+    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
+
+    // ACTIVE GIF
     activateJarvisGif();
+
+    // LANCE LA VOIX AU DÉBUT (OBLIGATOIRE POUR CHROME)
+    if (typeof responsiveVoice !== 'undefined' && voiceReady) {
+        responsiveVoice.cancel();
+        responsiveVoice.speak(cleanText, "French Male", {
+            pitch: 1,
+            rate: 0.95,
+            volume: 1,
+            onend: () => {
+                // Quand la voix finit, on attend la fin du typing
+                waitForTypingEnd();
+            }
+        });
+    }
 
     function type() {
         if (index < text.length) {
             element.textContent += text.charAt(index);
             index++;
-            element.parentElement.parentElement.scrollTop = element.parentElement.parentElement.scrollHeight;
+            element.parentElement.parentElement.scrollTop =
+                element.parentElement.parentElement.scrollHeight;
             setTimeout(type, 20);
         } else {
             element.classList.remove('typing');
-            
-            // DISATTIVA GIF quando finisce di scrivere
+            typingFinished = true;
+            checkEnd();
+        }
+    }
+
+    let typingFinished = false;
+    let voiceFinished = false;
+
+    function waitForTypingEnd() {
+        voiceFinished = true;
+        checkEnd();
+    }
+
+    function checkEnd() {
+        if (typingFinished && voiceFinished) {
             setTimeout(() => {
                 deactivateJarvisGif();
-                speakJarvis(text);
             }, 300);
         }
     }
+
     type();
 }
+
 
 // FORM SUBMIT
 document.getElementById('chatForm').addEventListener('submit', async (e) => {
