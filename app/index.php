@@ -604,7 +604,6 @@ body {
     <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 10px;">🌐 JARVIS - Contrôle Navigateur</div>
     <div id="browserNotificationText" style="margin-bottom: 15px; line-height: 1.5;"></div>
     <button onclick="closeBrowserNotification()" style="background: #000; color: var(--accent); border: none; padding: 10px 20px; border-radius: 8px
-
 <script src="https://code.responsivevoice.org/responsivevoice.js?key=A0SDeHMK"></script>
 <script>
 let messageCount = 0;
