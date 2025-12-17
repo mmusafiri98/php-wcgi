@@ -624,10 +624,8 @@ body {
 
 <!-- ============= MAIN JAVASCRIPT ============= -->
 <script>
-// =================== VARIABLES GLOBALES ===================
 let messageCount = 0;
 let voiceReady = false;
-let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 let recognition = null;
 let isListening = false;
 const jarvisGif = document.getElementById('jarvisGif');
@@ -646,333 +644,147 @@ function deactivateJarvisGif() {
     gifStatus.style.color = '#8bffcf';
 }
 
-
-// =================== DETECTION SUPPORT RECONNAISSANCE VOCALE ===================
+// RECONNAISSANCE VOCALE
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
-    
     recognition.lang = 'fr-FR';
     recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    
     document.getElementById('speechStatus').innerHTML = '✅ Disponible';
     
-    // EVENT: Résultat de la reconnaissance
     recognition.onresult = function(event) {
         const transcript = event.results[0][0].transcript;
-        console.log('🎤 Commande vocale:', transcript);
-        
-        // Afficher dans l'input
         document.getElementById('messageInput').value = transcript;
-        
-        // Envoyer automatiquement
-        setTimeout(() => {
-            document.getElementById('chatForm').dispatchEvent(new Event('submit'));
-        }, 500);
+        setTimeout(() => document.getElementById('chatForm').dispatchEvent(new Event('submit')), 500);
     };
     
-    // EVENT: Fin de l'écoute
     recognition.onend = function() {
         isListening = false;
         document.getElementById('voiceBtn').classList.remove('listening');
-        console.log('🎤 Reconnaissance vocale arrêtée');
     };
-    
-    // EVENT: Erreur
-    recognition.onerror = function(event) {
-        console.error('❌ Erreur reconnaissance vocale:', event.error);
-        isListening = false;
-        document.getElementById('voiceBtn').classList.remove('listening');
-        
-        if (event.error === 'not-allowed') {
-            alert('🎤 Permission microphone refusée. Veuillez autoriser l\'accès au microphone.');
-        }
-    };
-    
 } else {
     document.getElementById('speechStatus').innerHTML = '❌ Non supporté';
     document.getElementById('voiceBtn').disabled = true;
-    document.getElementById('voiceBtn').title = 'Reconnaissance vocale non supportée par ce navigateur';
 }
 
-// =================== BOUTON RECONNAISSANCE VOCALE ===================
-document.getElementById('voiceBtn').addEventListener('click', function() {
-    if (!recognition) {
-        alert('❌ Reconnaissance vocale non supportée par votre navigateur.');
-        return;
-    }
-    
+document.getElementById('voiceBtn').onclick = function() {
+    if (!recognition) return;
     if (isListening) {
-        // Arrêter l'écoute
         recognition.stop();
         isListening = false;
         this.classList.remove('listening');
     } else {
-        // Démarrer l'écoute
-        try {
-            recognition.start();
-            isListening = true;
-            this.classList.add('listening');
-            console.log('🎤 Reconnaissance vocale démarrée...');
-            
-            // Feedback vocal
-            speakJarvis("Je vous écoute.");
-        } catch (error) {
-            console.error('❌ Erreur démarrage reconnaissance:', error);
-        }
+        recognition.start();
+        isListening = true;
+        this.classList.add('listening');
     }
-});
+};
 
-// =================== INITIALISATION RESPONSIVEVOICE ===================
+// RESPONSIVEVOICE
 window.addEventListener('load', function() {
-    const checkRV = setInterval(() => {
-        if (typeof responsiveVoice !== 'undefined') {
-            clearInterval(checkRV);
-            
-            responsiveVoice.OnVoiceReady = function() {
-                voiceReady = true;
-                const voices = responsiveVoice.getVoices();
-                const frenchVoices = voices.filter(v => v.name.includes('French'));
-                
-                console.log("✅ ResponsiveVoice prêt");
-                console.log("🔊 Voix françaises:", frenchVoices.length);
-                
-                document.getElementById('voiceStatus').innerHTML = '🔊 Prête';
-                
-                if (isMobile) {
-                    document.getElementById('mobileVoiceNote').style.display = 'none';
-                }
-            };
-            
-            responsiveVoice.init();
-        }
-    }, 100);
-    
     setTimeout(() => {
-        if (!voiceReady) {
-            console.warn("⚠️ ResponsiveVoice timeout");
-            document.getElementById('voiceStatus').innerHTML = '🔊 Native';
+        if (typeof responsiveVoice !== 'undefined') {
+            voiceReady = true;
+            document.getElementById('voiceStatus').innerHTML = '🔊 Prête';
         }
-    }, 5000);
+    }, 2000);
 });
 
-// =================== FONCTION SYNTHÈSE VOCALE ===================
 function speakJarvis(text) {
-    // Nettoyer les commandes navigateur du texte à lire
     const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
-    
     if (typeof responsiveVoice !== 'undefined' && voiceReady) {
-        try {
-            responsiveVoice.cancel();
-            
-            const parameters = {
-                pitch: 1,
-                rate: 0.95,
-                volume: 1,
-                onstart: function() {
-                    document.getElementById('voiceStatus').innerHTML = '🔊 En cours...';
-                },
-                onend: function() {
-                    document.getElementById('voiceStatus').innerHTML = '🔊 Prête';
-                },
-                onerror: function(error) {
-                    console.error("❌ ResponsiveVoice erreur:", error);
-                    fallbackToNativeVoice(cleanText);
-                }
-            };
-            
-            responsiveVoice.speak(cleanText, "French Male", parameters);
-            return;
-            
-        } catch (error) {
-            console.warn("⚠️ ResponsiveVoice exception:", error);
-        }
+        responsiveVoice.speak(cleanText, "French Male", {pitch: 1, rate: 0.95, volume: 1});
     }
-    
-    fallbackToNativeVoice(cleanText);
 }
 
-// =================== FALLBACK API NATIVE ===================
-function fallbackToNativeVoice(text) {
-    if (!('speechSynthesis' in window)) {
-        console.warn("⚠️ Synthèse vocale non disponible");
-        return;
-    }
-
-    window.speechSynthesis.cancel();
-    
-    setTimeout(() => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'fr-FR';
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-        
-        const voices = window.speechSynthesis.getVoices();
-        const frenchVoice = voices.find(v => 
-            v.lang === 'fr-FR' || v.lang.startsWith('fr')
-        );
-        
-        if (frenchVoice) {
-            utterance.voice = frenchVoice;
-        }
-        
-        window.speechSynthesis.speak(utterance);
-    }, 100);
-}
-
-// =================== FONCTION TEST VOCAL ===================
 function testVoice() {
     speakJarvis("Bonjour, je suis JARVIS. Tous les systèmes sont opérationnels.");
 }
 
-// =================== CONTROLE NAVIGATEUR ===================
-let openedTab = null;
-let jarvisTabName = 'JARVIS_AI_MAIN_TAB';
-
-// Marquer cet onglet comme l'onglet JARVIS principal
-window.name = jarvisTabName;
-
+// CONTROLE NAVIGATEUR
 function executeBrowserCommand(command) {
     if (!command) return;
-    
-    const action = command.action;
-    const param = command.param;
-    
-    if (action === 'OPEN') {
-        // Ouvrir une URL dans un nouvel onglet
-        openedTab = window.open(param, '_blank');
-        
-        if (openedTab) {
-            showBrowserNotification(`✅ Page ouverte dans un nouvel onglet:<br><strong>${param}</strong><br><br>💡 <em>Pour revenir à JARVIS, cliquez sur l'onglet JARVIS dans votre navigateur ou utilisez Alt+Tab (PC) / Cmd+Tab (Mac)</em>`);
-            document.getElementById('browserStatus').innerHTML = '🌐 Page ouverte';
-            
-            // Afficher le bouton de retour sur cette page
-            showReturnButton();
-        } else {
-            showBrowserNotification(`⚠️ Impossible d'ouvrir la page. Vérifiez que les pop-ups ne sont pas bloqués.`);
-        }
-        
-    } else if (action === 'SEARCH') {
-        // Recherche Google dans un nouvel onglet
-        const searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(param);
-        openedTab = window.open(searchUrl, '_blank');
-        
-        if (openedTab) {
-            showBrowserNotification(`🔍 Recherche Google ouverte:<br><strong>${param}</strong><br><br>💡 <em>Pour revenir à JARVIS, cliquez sur l'onglet JARVIS dans votre navigateur</em>`);
-            document.getElementById('browserStatus').innerHTML = '🔍 Recherche en cours';
-            
-            // Afficher le bouton de retour sur cette page
-            showReturnButton();
-        } else {
-            showBrowserNotification(`⚠️ Impossible d'ouvrir la recherche. Vérifiez que les pop-ups ne sont pas bloqués.`);
-        }
-        
-    } else if (action === 'CLOSE') {
-        // Fermer l'onglet ouvert (si possible)
-        if (openedTab && !openedTab.closed) {
-            openedTab.close();
-            openedTab = null;
-            showBrowserNotification(`✅ Onglet fermé avec succès.`);
-            document.getElementById('browserStatus').innerHTML = '✅ Actif';
-            hideReturnButton();
-        } else {
-            showBrowserNotification(`ℹ️ Aucun onglet JARVIS ouvert à fermer.<br><em>Note: Pour raisons de sécurité, je ne peux fermer que les onglets que j'ai ouverts.</em>`);
-        }
+    if (command.action === 'OPEN') {
+        window.open(command.param, '_blank');
+        showBrowserNotification(`✅ Page ouverte: ${command.param}`);
+    } else if (command.action === 'SEARCH') {
+        window.open('https://www.google.com/search?q=' + encodeURIComponent(command.param), '_blank');
+        showBrowserNotification(`🔍 Recherche: ${command.param}`);
     }
-}
-
-function showReturnButton() {
-    const btn = document.getElementById('returnToJarvisBtn');
-    btn.style.display = 'block';
-    
-    // Masquer après 10 secondes
-    setTimeout(() => {
-        btn.style.display = 'none';
-    }, 10000);
-}
-
-function hideReturnButton() {
-    document.getElementById('returnToJarvisBtn').style.display = 'none';
-}
-
-function focusJarvisTab() {
-    // Cette fonction permet de refocaliser l'onglet JARVIS
-    window.focus();
-    hideReturnButton();
-    speakJarvis("Me revoilà ! Comment puis-je vous aider ?");
 }
 
 function showBrowserNotification(message) {
-    const notification = document.getElementById('browserNotification');
-    const notificationText = document.getElementById('browserNotificationText');
-    
-    notificationText.innerHTML = message;
-    notification.style.display = 'block';
-    
-    // Auto-fermeture après 12 secondes (plus long pour lire le message)
-    setTimeout(() => {
-        closeBrowserNotification();
-    }, 12000);
+    document.getElementById('browserNotificationText').innerHTML = message;
+    document.getElementById('browserNotification').style.display = 'block';
+    setTimeout(() => closeBrowserNotification(), 8000);
 }
 
 function closeBrowserNotification() {
-    const notification = document.getElementById('browserNotification');
-    notification.style.display = 'none';
+    document.getElementById('browserNotification').style.display = 'none';
 }
 
-// Fonction legacy conservée pour compatibilité
-function closeBrowser() {
-    if (openedTab && !openedTab.closed) {
-        openedTab.close();
-        openedTab = null;
-        document.getElementById('browserStatus').innerHTML = '✅ Actif';
-        speakJarvis("Onglet fermé.");
-        hideReturnButton();
-    }
-}
-
-function returnToJarvis() {
-    closeBrowser();
-    speakJarvis("Je suis de retour. Comment puis-je vous aider ?");
-}
-
-// Détecter quand l'utilisateur revient sur l'onglet JARVIS
-document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) {
-        // L'utilisateur est revenu sur l'onglet JARVIS
-        hideReturnButton();
-        
-        // Vérifier si l'onglet ouvert est toujours actif
-        if (openedTab && openedTab.closed) {
-            openedTab = null;
-            document.getElementById('browserStatus').innerHTML = '✅ Actif';
-        }
-    }
-});
-
-// =================== FONCTION TYPING ANIMATION ===================
+// ===============================
+// ANIMATION TYPING + VOIX SYNCHRO
+// ===============================
 function typeWriter(text, element) {
     let index = 0;
     element.classList.add('typing');
+
+    // Nettoyage texte pour la voix
+    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
+
+    // ACTIVE GIF
+    activateJarvisGif();
+
+    // LANCE LA VOIX AU DÉBUT (OBLIGATOIRE POUR CHROME)
+    if (typeof responsiveVoice !== 'undefined' && voiceReady) {
+        responsiveVoice.cancel();
+        responsiveVoice.speak(cleanText, "French Male", {
+            pitch: 1,
+            rate: 0.95,
+            volume: 1,
+            onend: () => {
+                // Quand la voix finit, on attend la fin du typing
+                waitForTypingEnd();
+            }
+        });
+    }
 
     function type() {
         if (index < text.length) {
             element.textContent += text.charAt(index);
             index++;
-            element.parentElement.parentElement.scrollTop = element.parentElement.parentElement.scrollHeight;
+            element.parentElement.parentElement.scrollTop =
+                element.parentElement.parentElement.scrollHeight;
             setTimeout(type, 20);
         } else {
             element.classList.remove('typing');
-            setTimeout(() => speakJarvis(text), 300);
+            typingFinished = true;
+            checkEnd();
         }
     }
+
+    let typingFinished = false;
+    let voiceFinished = false;
+
+    function waitForTypingEnd() {
+        voiceFinished = true;
+        checkEnd();
+    }
+
+    function checkEnd() {
+        if (typingFinished && voiceFinished) {
+            setTimeout(() => {
+                deactivateJarvisGif();
+            }, 300);
+        }
+    }
+
     type();
 }
 
-// =================== GESTION DU FORMULAIRE ===================
+
+// FORM SUBMIT
 document.getElementById('chatForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -996,6 +808,9 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     userMsgDiv.className = 'msg-user';
     userMsgDiv.textContent = userMessage;
     chatWindow.appendChild(userMsgDiv);
+
+    // ATTIVA GIF durante "thinking"
+    activateJarvisGif();
 
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'msg-jarvis';
@@ -1033,29 +848,20 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         jarvisMsgDiv.appendChild(typingSpan);
         chatWindow.appendChild(jarvisMsgDiv);
 
-        if (data.debug && !data.success) {
-            const debugDiv = document.createElement('details');
-            debugDiv.style.cssText = 'color:#ff6b6b;font-size:10px;margin-top:10px;';
-            debugDiv.innerHTML = `<summary>🔍 Debug Info</summary><pre>${data.debug}</pre>`;
-            chatWindow.appendChild(debugDiv);
-        }
-
-        // Nettoyer le message des commandes navigateur pour l'affichage
         const displayMessage = data.message.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
         
+        // ANIMAZIONE TYPING (che gestisce il GIF)
         typeWriter(displayMessage, typingSpan);
 
-        // Exécuter commande navigateur si présente
         if (data.browserCommand) {
-            setTimeout(() => {
-                executeBrowserCommand(data.browserCommand);
-            }, 1000);
+            setTimeout(() => executeBrowserCommand(data.browserCommand), 1000);
         }
 
         chatWindow.scrollTop = chatWindow.scrollHeight;
 
     } catch (error) {
         thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
+        deactivateJarvisGif();
         console.error('Erreur:', error);
     } finally {
         sendBtn.disabled = false;
@@ -1064,11 +870,9 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     }
 });
 
-// =================== FOCUS AUTOMATIQUE ===================
 document.getElementById('messageInput').focus();
 
-console.log('🚀 JARVIS AI avec Contrôle Vocal initialisé !');
+console.log('🚀 JARVIS AI avec GIF animé pendant réponse initialisé !');
 </script>
-
 </body>
 </html>
