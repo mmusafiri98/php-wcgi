@@ -630,6 +630,22 @@ let voiceReady = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 let recognition = null;
 let isListening = false;
+const jarvisGif = document.getElementById('jarvisGif');
+const gifStatus = document.getElementById('gifStatus');
+
+// ATTIVA/DISATTIVA GIF
+function activateJarvisGif() {
+    jarvisGif.classList.add('active');
+    gifStatus.textContent = '✨ Attivo';
+    gifStatus.style.color = '#00ff00';
+}
+
+function deactivateJarvisGif() {
+    jarvisGif.classList.remove('active');
+    gifStatus.textContent = '💤 In attesa';
+    gifStatus.style.color = '#8bffcf';
+}
+
 
 // =================== DETECTION SUPPORT RECONNAISSANCE VOCALE ===================
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
