@@ -1,0 +1,63 @@
+Parfait 👍 maintenant le message est très clair et on est presque au bout.
+
+👉 n8n a changé ses exigences Node récemment
+Tu es en Node 20.11.1, mais n8n demande maintenant au minimum 20.19.0.
+
+✅ Solution exacte (2 minutes)
+🔽 1️⃣ Installer la bonne version de Node (20.19.0 ou +)
+
+Avec nvm (Windows) :
+
+nvm install 20.19.0
+nvm use 20.19.0
+
+
+Vérifie :
+
+node -v
+
+
+✅ Résultat attendu :
+
+v20.19.0
+
+🔄 2️⃣ (Optionnel mais conseillé) Réinstaller n8n
+
+Si n8n a été installé avec une autre version Node :
+
+npm uninstall -g n8n
+npm install -g n8n
+
+▶️ 3️⃣ Lancer n8n
+n8n
+
+
+Puis ouvrir :
+
+http://localhost:5678
+
+❗ Important à retenir
+
+❌ Node 20.11.1 → trop ancien pour n8n actuel
+
+✅ Node 20.19.0 à 20.x récent → OK
+
+⚠️ Node 22 → parfois OK pour n8n récent, mais instable selon modules
+
+🟢 Node 20.19.x = le meilleur choix
+
+📌 Résumé
+Node.js	Statut n8n
+18.x	❌ plus supporté
+20.11.1	❌ trop ancien
+20.19.x	✅ recommandé
+22.x	⚠️ pas fiable
+24.x	⚠️ expérimental
+
+Si tu veux, dis-moi :
+
+la sortie exacte de n8n --version
+
+si tu veux bloquer définitivement Node 20 pour n8n
+
+Je t’aide à sécuriser ton setup 💪
