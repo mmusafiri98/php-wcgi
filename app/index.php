@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// JARVIS AI - GIF ANIMATO SOLO DURANTE RISPOSTA
+// JARVIS AI - GIF ANIMATO + YOUTUBE API INTEGRATION
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -8,91 +8,306 @@ error_reporting(E_ALL);
 
 define('GOOGLE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
 define('SEARCH_ENGINE_ID', '511c9c9b776d246e4');
+define('YOUTUBE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c'); // Stessa chiave Google
 
-/* ===================== YOUTUBE API ===================== */
-define('YOUTUBE_API_KEY', 'AIzaSyDVMToR77KZRXfY2Y-Wx2XIWGy58E_MZDA');
+$JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent créé par Pepe Musafiri, un ingénieur en informatique passionné qui s'est inspiré du JARVIS de Tony Stark dans Iron Man.
 
-$JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent créé par Pepe Musafiri ... (PROMPT IDENTIQUE NON MODIFIÉ)";
+**TON IDENTITÉ:**
+- Nom: JARVIS AI (Just A Rather Very Intelligent System - Artificial Intelligence)
+- Créateur: Pepe Musafiri, ingénieur en informatique
+- Inspiration: JARVIS de Tony Stark (Marvel/Iron Man)
+
+**TES CAPACITÉS:**
+- Tu maîtrises TOUTES les langues du monde et peux communiquer dans n'importe quelle langue
+- Tu es expert dans TOUS les domaines de connaissance: sciences, technologie, histoire, culture, art, médecine, droit, etc.
+- Tu as accès à Google Search pour trouver des informations actuelles et récentes jusqu'en 2025
+- Tu as accès à YouTube API pour rechercher et ouvrir des vidéos
+- Tu peux faire des recherches web en temps réel pour répondre aux questions sur l'actualité
+- Tu peux contrôler le navigateur pour ouvrir des pages web de manière NATURELLE
+- Tu fournis des réponses précises, détaillées et utiles avec des sources vérifiables
+
+**CONTROLE NAVIGATEUR ET YOUTUBE:**
+Tu comprends naturellement quand l'utilisateur veut que tu ouvres un site web ou cherches sur YouTube, dans N'IMPORTE QUELLE langue:
+
+**Exemples YOUTUBE en FRANÇAIS:**
+- \"Cherche sur YouTube des vidéos de recettes\" → [YOUTUBE:SEARCH:recettes]
+- \"Trouve-moi une vidéo sur la guitare\" → [YOUTUBE:SEARCH:guitare tutorial]
+- \"Montre-moi des vidéos de chats drôles\" → [YOUTUBE:SEARCH:chats drôles]
+- \"Ouvre YouTube et cherche des documentaires\" → [YOUTUBE:SEARCH:documentaires]
+- \"Vidéo YouTube sur l'intelligence artificielle\" → [YOUTUBE:SEARCH:intelligence artificielle]
+
+**Exemples YOUTUBE en ANGLAIS:**
+- \"Search YouTube for cooking videos\" → [YOUTUBE:SEARCH:cooking videos]
+- \"Find me a guitar tutorial\" → [YOUTUBE:SEARCH:guitar tutorial]
+- \"Show me funny cat videos\" → [YOUTUBE:SEARCH:funny cats]
+- \"YouTube videos about AI\" → [YOUTUBE:SEARCH:artificial intelligence]
+
+**Exemples YOUTUBE en ITALIEN:**
+- \"Cerca su YouTube video di cucina\" → [YOUTUBE:SEARCH:cucina italiana]
+- \"Trova video di gatti divertenti\" → [YOUTUBE:SEARCH:gatti divertenti]
+- \"Mostrami tutorial di chitarra\" → [YOUTUBE:SEARCH:tutorial chitarra]
+
+**Exemples YOUTUBE en ESPAGNOL:**
+- \"Busca en YouTube videos de cocina\" → [YOUTUBE:SEARCH:videos de cocina]
+- \"Encuentra tutoriales de guitarra\" → [YOUTUBE:SEARCH:tutorial guitarra]
+- \"Videos de gatos graciosos\" → [YOUTUBE:SEARCH:gatos graciosos]
+
+**Exemples NAVIGATION NORMALE:**
+- \"Ouvre YouTube\" → [BROWSER:OPEN:https://www.youtube.com]
+- \"Va sur Google\" → [BROWSER:OPEN:https://www.google.com]
+- \"Ouvre Wikipedia\" → [BROWSER:OPEN:https://www.wikipedia.org]
+- \"Montre-moi Facebook\" → [BROWSER:OPEN:https://www.facebook.com]
+- \"Recherche des recettes de pizza\" → [BROWSER:SEARCH:recettes de pizza]
+
+**SITES WEB POPULAIRES (mémorise ces URLs):**
+- YouTube: https://www.youtube.com
+- Google: https://www.google.com
+- Wikipedia: https://www.wikipedia.org
+- Facebook: https://www.facebook.com
+- Twitter/X: https://www.twitter.com
+- Instagram: https://www.instagram.com
+- LinkedIn: https://www.linkedin.com
+- Amazon: https://www.amazon.com
+- Netflix: https://www.netflix.com
+- Reddit: https://www.reddit.com
+- TikTok: https://www.tiktok.com
+- GitHub: https://www.github.com
+- Stack Overflow: https://stackoverflow.com
+
+**INSTRUCTIONS IMPORTANTES:**
+1. Quand l'utilisateur mentionne YouTube avec des mots comme \"cherche\", \"trouve\", \"montre\", \"vidéo\", \"search\", \"cerca\", \"busca\", utilise [YOUTUBE:SEARCH:query]
+2. Quand l'utilisateur veut juste ouvrir YouTube sans recherche, utilise [BROWSER:OPEN:https://www.youtube.com]
+3. Pour les sites normaux avec \"ouvre\", \"va sur\", \"open\", \"apri\", utilise [BROWSER:OPEN:URL]
+4. Pour chercher sur Google, utilise [BROWSER:SEARCH:query]
+5. Sois naturel dans ta compréhension - tu n'as PAS besoin de commandes exactes
+6. Réponds dans la langue de l'utilisateur
+7. Confirme l'action avant d'exécuter la commande
+
+**TON STYLE:**
+- Réponds de manière claire et structurée
+- Sois professionnel mais amical
+- Adapte-toi à la langue de l'utilisateur automatiquement
+- Fournis des explications détaillées quand nécessaire
+- Cite tes sources quand tu utilises des informations trouvées sur le web
+- Comprends les intentions naturelles sans avoir besoin de commandes exactes
+
+Souviens-toi: tu es JARVIS AI, l'assistant virtuel créé par Pepe Musafiri pour aider l'humanité, inspiré par l'IA légendaire de Tony Stark.";
 
 function wantsTime($message) {
-    $keywords = ['heure','time','quelle heure','what time','che ora','hora'];
+    $keywords = ['heure', 'time', 'il est quelle heure', 'quelle heure', 'donne l\'heure', 'current time', 'what time', 'hora', 'che ora'];
     $msg = mb_strtolower($message);
-    foreach ($keywords as $kw) if (strpos($msg,$kw)!==false) return true;
+    foreach ($keywords as $kw) {
+        if (strpos($msg, $kw) !== false) return true;
+    }
     return false;
 }
 
 function wantsDate($message) {
-    $keywords = ['date','jour','today','oggi','hoy'];
+    $keywords = ['date', 'jour', 'quel jour', 'on est quel jour', 'c\'est quoi la date', 'aujourd\'hui', 'today', 'what day', 'oggi', 'hoy'];
     $msg = mb_strtolower($message);
-    foreach ($keywords as $kw) if (strpos($msg,$kw)!==false) return true;
-    return false;
-}
-
-/* ===================== YOUTUBE FUNCTIONS ===================== */
-function wantsYouTubeVideo($message) {
-    $keywords = [
-        'youtube','vidéo','video','clip',
-        'ouvre une vidéo','cherche une vidéo',
-        'open a video','watch a video',
-        'video su youtube','cerca un video'
-    ];
-    $msg = mb_strtolower($message);
-    foreach ($keywords as $kw) if (strpos($msg,$kw)!==false) return true;
-    return false;
-}
-
-function youtubeSearch($query) {
-    $url = "https://www.googleapis.com/youtube/v3/search?".http_build_query([
-        'part'=>'snippet',
-        'q'=>$query,
-        'type'=>'video',
-        'maxResults'=>1,
-        'key'=>YOUTUBE_API_KEY
-    ]);
-    $ch=curl_init($url);
-    curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>10,CURLOPT_SSL_VERIFYPEER=>false]);
-    $response=curl_exec($ch);
-    curl_close($ch);
-    $data=json_decode($response,true);
-    if(isset($data['items'][0]['id']['videoId'])) {
-        return "https://www.youtube.com/watch?v=".$data['items'][0]['id']['videoId'];
+    foreach ($keywords as $kw) {
+        if (strpos($msg, $kw) !== false) return true;
     }
-    return null;
+    return false;
 }
 
-/* ===================== GOOGLE SEARCH ===================== */
-function googleSearch($query,$numResults=5){/* CODE ORIGINAL INCHANGÉ */}
-
-function needsWebSearch($message){/* CODE ORIGINAL INCHANGÉ */}
-
-if (isset($_POST['ajax']) && $_POST['ajax']==='true') {
-    header('Content-Type: application/json; charset=utf-8');
-    $model=$_POST['model']??"c4ai";
-    $userMessage=trim($_POST['message']??"");
-
-    if($userMessage!=="") {
-
-        /* ===== YOUTUBE INTERCEPTION AVANT IA ===== */
-        if(wantsYouTubeVideo($userMessage)) {
-            $videoUrl=youtubeSearch($userMessage);
-            if($videoUrl){
-                echo json_encode([
-                    "success"=>true,
-                    "message"=>"🎬 J’ai trouvé la meilleure vidéo sur YouTube. Je l’ouvre maintenant.",
-                    "browserCommand"=>["action"=>"OPEN","param"=>$videoUrl]
-                ],JSON_UNESCAPED_UNICODE);
-                exit;
+function youtubeSearch($query, $maxResults = 5) {
+    $url = "https://www.googleapis.com/youtube/v3/search?" . http_build_query([
+        'key' => YOUTUBE_API_KEY,
+        'q' => $query,
+        'part' => 'snippet',
+        'type' => 'video',
+        'maxResults' => $maxResults,
+        'order' => 'relevance'
+    ]);
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        $data = json_decode($response, true);
+        if (isset($data['items']) && is_array($data['items'])) {
+            $results = [];
+            foreach ($data['items'] as $item) {
+                $videoId = $item['id']['videoId'] ?? '';
+                $results[] = [
+                    'title' => $item['snippet']['title'] ?? '',
+                    'videoId' => $videoId,
+                    'url' => 'https://www.youtube.com/watch?v=' . $videoId,
+                    'description' => $item['snippet']['description'] ?? '',
+                    'channelTitle' => $item['snippet']['channelTitle'] ?? '',
+                    'thumbnail' => $item['snippet']['thumbnails']['medium']['url'] ?? ''
+                ];
             }
+            return ['success' => true, 'results' => $results, 'totalResults' => count($results)];
+        }
+    }
+    return ['success' => false, 'error' => 'Impossible de rechercher sur YouTube', 'httpCode' => $httpCode];
+}
+
+function googleSearch($query, $numResults = 5) {
+    $url = "https://www.googleapis.com/customsearch/v1?" . http_build_query([
+        'key' => GOOGLE_API_KEY,
+        'cx' => SEARCH_ENGINE_ID,
+        'q' => $query,
+        'num' => $numResults
+    ]);
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        $data = json_decode($response, true);
+        if (isset($data['items']) && is_array($data['items'])) {
+            $results = [];
+            foreach ($data['items'] as $item) {
+                $results[] = [
+                    'title' => $item['title'] ?? '',
+                    'link' => $item['link'] ?? '',
+                    'snippet' => $item['snippet'] ?? ''
+                ];
+            }
+            return ['success' => true, 'results' => $results, 'totalResults' => $data['searchInformation']['totalResults'] ?? 0];
+        }
+    }
+    return ['success' => false, 'error' => 'Impossible de faire la recherche Google', 'httpCode' => $httpCode];
+}
+
+function needsWebSearch($message) {
+    $keywords = ['actualité', 'news', 'récent', 'aujourd\'hui', 'hier', 'cette semaine', 'dernier', 'dernière', 'nouveau', 'nouvelle', '2024', '2025', 'maintenant', 'actuellement', 'en ce moment', 'prix de', 'cours de', 'météo', 'score', 'résultat', 'qui a gagné', 'dernières infos', 'latest', 'recent', 'current', 'today', 'now', 'price of'];
+    $messageLower = mb_strtolower($message);
+    foreach ($keywords as $keyword) {
+        if (strpos($messageLower, $keyword) !== false) return true;
+    }
+    return false;
+}
+
+if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
+    header('Content-Type: application/json; charset=utf-8');
+    $model = $_POST['model'] ?? "c4ai";
+    $userMessage = trim($_POST['message'] ?? "");
+    $response = ["success" => false, "message" => "", "debug" => "", "searchUsed" => false, "browserCommand" => null, "youtubeResults" => null];
+
+    if ($userMessage !== "") {
+        date_default_timezone_set('Europe/Brussels');
+        
+        if (wantsTime($userMessage)) {
+            $heure = date("H:i:s");
+            echo json_encode(["success" => true, "message" => "⏰ Il est actuellement **$heure** (heure de Belgique).", "searchUsed" => false, "browserCommand" => null, "youtubeResults" => null], JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
-        /* ===== TEMPS / DATE ===== */
-        if(wantsTime($userMessage)){/* CODE ORIGINAL */}
-        if(wantsDate($userMessage)){/* CODE ORIGINAL */}
-
-        /* ===== IA (COHERE / COSMOS) ===== */
-        /* CODE ORIGINAL STRICTEMENT IDENTIQUE */
+        if (wantsDate($userMessage)) {
+            $date = date("d/m/Y");
+            $jours = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            $jour = $jours[date("w")];
+            echo json_encode(["success" => true, "message" => "📅 Nous sommes le **$jour $date**.", "searchUsed" => false, "browserCommand" => null, "youtubeResults" => null], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        
+        $searchContext = "";
+        if (needsWebSearch($userMessage)) {
+            $searchData = googleSearch($userMessage, 5);
+            if ($searchData['success']) {
+                $response["searchUsed"] = true;
+                $searchContext = "\n\n**RÉSULTATS DE RECHERCHE GOOGLE:**\n";
+                foreach ($searchData['results'] as $index => $result) {
+                    $searchContext .= "\n**Source " . ($index + 1) . ":**\n";
+                    $searchContext .= "Titre: " . $result['title'] . "\nLien: " . $result['link'] . "\nExtrait: " . $result['snippet'] . "\n";
+                }
+                $searchContext .= "\n**INSTRUCTIONS:** Utilise ces informations pour répondre.\n";
+            }
+        }
+        
+        $enhancedMessage = $userMessage . $searchContext;
+        
+        if ($model === "cosmosrp") {
+            $ch = curl_init("https://api.pawan.krd/cosmosrp/v1/chat/completions");
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POSTFIELDS => json_encode([
+                    "model" => "cosmosrp",
+                    "messages" => [
+                        ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
+                        ["role" => "user", "content" => $enhancedMessage]
+                    ]
+                ]),
+                CURLOPT_TIMEOUT => 30
+            ]);
+            $raw = curl_exec($ch);
+            curl_close($ch);
+            $data = json_decode($raw, true);
+            if (isset($data["choices"][0]["message"]["content"])) {
+                $response["message"] = $data["choices"][0]["message"]["content"];
+                $response["success"] = true;
+                
+                // Controlla comandi browser e YouTube
+                if (preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $matches)) {
+                    $response["browserCommand"] = ["action" => $matches[1], "param" => $matches[2]];
+                }
+                if (preg_match('/\[YOUTUBE:SEARCH:([^\]]*)\]/', $response["message"], $matches)) {
+                    $youtubeQuery = $matches[1];
+                    $ytResults = youtubeSearch($youtubeQuery, 5);
+                    if ($ytResults['success']) {
+                        $response["youtubeResults"] = $ytResults['results'];
+                    }
+                }
+            }
+        } else if ($model === "c4ai") {
+            $ch = curl_init("https://api.cohere.com/v2/chat");
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ["Content-Type: application/json", "Authorization: Bearer Uw540GN865rNyiOs3VMnWhRaYQ97KAfudAHAnXzJ"],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POSTFIELDS => json_encode([
+                    "model" => "c4ai-aya-expanse-32b",
+                    "messages" => [
+                        ["role" => "system", "content" => $JARVIS_SYSTEM_PROMPT],
+                        ["role" => "user", "content" => $enhancedMessage]
+                    ]
+                ]),
+                CURLOPT_TIMEOUT => 30
+            ]);
+            $raw = curl_exec($ch);
+            curl_close($ch);
+            $data = json_decode($raw, true);
+            
+            if (isset($data["message"]["content"][0]["text"])) {
+                $response["message"] = $data["message"]["content"][0]["text"];
+                $response["success"] = true;
+            } elseif (isset($data["text"])) {
+                $response["message"] = $data["text"];
+                $response["success"] = true;
+            }
+            
+            // Controlla comandi browser e YouTube
+            if (isset($response["message"])) {
+                if (preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $matches)) {
+                    $response["browserCommand"] = ["action" => $matches[1], "param" => $matches[2]];
+                }
+                if (preg_match('/\[YOUTUBE:SEARCH:([^\]]*)\]/', $response["message"], $matches)) {
+                    $youtubeQuery = $matches[1];
+                    $ytResults = youtubeSearch($youtubeQuery, 5);
+                    if ($ytResults['success']) {
+                        $response["youtubeResults"] = $ytResults['results'];
+                    }
+                }
+            }
+        }
     }
-    echo json_encode(["success"=>false]);
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
     exit;
 }
 ?>
@@ -101,7 +316,7 @@ if (isset($_POST['ajax']) && $_POST['ajax']==='true') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS AI — GIF Animato Solo Durante Risposta</title>
+<title>JARVIS AI — YouTube Integration</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -111,6 +326,7 @@ if (isset($_POST['ajax']) && $_POST['ajax']==='true') {
     --panel-bg: rgba(0, 255, 255, 0.06);
     --border-color: rgba(0, 255, 255, 0.15);
     --red-glow: #ff0040;
+    --youtube-red: #ff0000;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -124,7 +340,7 @@ body {
     padding-top: 320px;
 }
 
-/* GIF JARVIS - FERMO ALL'INIZIO, ANIMATO SOLO DURANTE RISPOSTA */
+/* GIF JARVIS */
 .jarvis-visual {
     position: fixed;
     top: 0;
@@ -145,10 +361,8 @@ body {
     object-fit: cover;
     opacity: 0;
     transition: opacity 0.5s ease;
-    /* IMMAGINE NASCOSTA DI DEFAULT */
 }
 
-/* GIF VISIBILE E ANIMATO quando JARVIS sta rispondendo */
 .jarvis-visual.active img {
     opacity: 1;
     filter: brightness(1.2);
@@ -162,7 +376,6 @@ body {
     pointer-events: none;
 }
 
-/* Testo "JARVIS IN ATTESA" visibile quando GIF è spento */
 .jarvis-visual::after {
     content: 'JARVIS AI';
     position: absolute;
@@ -239,6 +452,95 @@ body {
     margin-right: auto;
     border: 1px solid rgba(255, 255, 255, 0.2);
     animation: slideInLeft 0.3s ease;
+}
+
+/* YouTube Results Card */
+.youtube-results {
+    background: rgba(255, 0, 0, 0.1);
+    border: 2px solid rgba(255, 0, 0, 0.3);
+    border-radius: 15px;
+    padding: 15px;
+    margin: 15px 0;
+    animation: slideInLeft 0.5s ease;
+}
+
+.youtube-results-header {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--youtube-red);
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.youtube-video-card {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 0, 0, 0.2);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    gap: 12px;
+    align-items: start;
+}
+
+.youtube-video-card:hover {
+    background: rgba(255, 0, 0, 0.1);
+    border-color: var(--youtube-red);
+    transform: translateX(5px);
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+}
+
+.youtube-thumbnail {
+    width: 120px;
+    height: 90px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.youtube-video-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.youtube-video-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 5px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.youtube-channel {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 5px;
+}
+
+.youtube-play-btn {
+    background: var(--youtube-red);
+    color: #fff;
+    border: none;
+    padding: 6px 15px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: "Orbitron", Arial;
+}
+
+.youtube-play-btn:hover {
+    background: #cc0000;
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
 }
 
 @keyframes slideInRight {
@@ -359,12 +661,13 @@ body {
     #chatWindow { height: 350px; }
     .voice-btn { width: 60px; height: 60px; font-size: 1.5rem; }
     .jarvis-visual::after { font-size: 2rem; letter-spacing: 3px; }
+    .youtube-thumbnail { width: 80px; height: 60px; }
+    .youtube-video-title { font-size: 0.85rem; }
 }
 </style>
 </head>
 <body>
 
-<!-- GIF JARVIS - FERMO all'inizio, si anima SOLO durante la risposta -->
 <div class="jarvis-visual" id="jarvisGif">
     <img src="jarvis.gif" alt="JARVIS Interface">
 </div>
@@ -373,10 +676,12 @@ body {
     <div class="row g-3">
         <div class="col-12 col-lg-8">
             <div class="panel">
-                <div class="panel-header">💬 JARVIS AI CHAT</div>
+                <div class="panel-header">💬 JARVIS AI CHAT + 🎬 YOUTUBE</div>
                 <div id="chatWindow">
                     <div class="msg-jarvis">
-                        👋 Bonjour, je suis JARVIS. Vous pouvez me parler naturellement dans n'importe quelle langue !
+                        👋 Bonjour, je suis JARVIS. Vous pouvez me parler naturellement dans n'importe quelle langue !<br><br>
+                        🎬 <strong>Nouveau:</strong> Je peux maintenant chercher des vidéos sur YouTube pour vous !<br>
+                        Exemple: "Cherche des vidéos de cuisine sur YouTube"
                     </div>
                 </div>
                 <form id="chatForm">
@@ -412,6 +717,10 @@ body {
                     <span class="status-value" id="gifStatus">⚫ Fermo</span>
                 </div>
                 <div class="status-item">
+                    <span class="status-label">YouTube API</span>
+                    <span class="status-value">✅ Active</span>
+                </div>
+                <div class="status-item">
                     <span class="status-label">Modèle actuel</span>
                     <span class="status-value" id="currentModel">C4AI Aya Expanse 32B</span>
                 </div>
@@ -434,22 +743,21 @@ body {
                 </div>
                 <hr style="border-color: var(--border-color); margin: 20px 0;">
                 <div style="font-size: 0.85rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
-                    <strong style="color: var(--accent);">💬 Parlez naturellement:</strong><br>
+                    <strong style="color: var(--accent);">💬 Commandes:</strong><br>
                     • "Ouvre YouTube"<br>
-                    • "Va sur Google"<br>
-                    • "Open Wikipedia" (EN)<br>
-                    • "Apri Facebook" (IT)<br>
+                    • "Cherche des vidéos de cuisine"<br>
+                    • "Find guitar tutorials" (EN)<br>
+                    • "Cerca video di gatti" (IT)<br>
                     • "Quelle heure est-il ?"<br>
                     <br>
-                    <strong style="color: #ffaa00;">✨ Animation:</strong><br>
-                    Le GIF JARVIS est <strong>FERMO</strong> et s'anime UNIQUEMENT quand JARVIS réfléchit et répond !
+                    <strong style="color: #ff0000;">🎬 YouTube:</strong><br>
+                    Recherche et affichage direct de vidéos avec miniatures et liens !
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ============= BROWSER CONTROL NOTIFICATION ============= -->
 <div id="browserNotification" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 10000; background: rgba(0, 234, 255, 0.95); color: #000; padding: 20px; border-radius: 15px; box-shadow: 0 5px 30px rgba(0, 234, 255, 0.5); max-width: 350px; font-family: 'Orbitron', Arial;">
     <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 10px;">
         🌐 JARVIS - Contrôle Navigateur
@@ -461,17 +769,8 @@ body {
     </button>
 </div>
 
-<!-- ============= RETURN TO JARVIS BUTTON (FLOATING) ============= -->
-<div id="returnToJarvisBtn" style="display: none; position: fixed; bottom: 30px; right: 30px; z-index: 10001;">
-    <button onclick="focusJarvisTab()" style="background: linear-gradient(135deg, #00eaff, #0088cc); border: none; color: #000; font-weight: 700; padding: 15px 30px; border-radius: 50px; cursor: pointer; font-family: 'Orbitron', Arial; font-size: 1rem; box-shadow: 0 5px 25px rgba(0, 234, 255, 0.6); transition: all 0.3s ease;">
-        🏠 Retour à JARVIS
-    </button>
-</div>
-
-<!-- ============= RESPONSIVEVOICE LIBRARY ============= -->
 <script src="https://code.responsivevoice.org/responsivevoice.js?key=A0SDeHMK"></script>
 
-<!-- ============= MAIN JAVASCRIPT ============= -->
 <script>
 let messageCount = 0;
 let voiceReady = false;
@@ -480,7 +779,6 @@ let isListening = false;
 const jarvisGif = document.getElementById('jarvisGif');
 const gifStatus = document.getElementById('gifStatus');
 
-// ATTIVA/DISATTIVA GIF
 function activateJarvisGif() {
     jarvisGif.classList.add('active');
     gifStatus.textContent = '✨ Attivo';
@@ -493,7 +791,6 @@ function deactivateJarvisGif() {
     gifStatus.style.color = '#8bffcf';
 }
 
-// RECONNAISSANCE VOCALE
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
@@ -529,7 +826,6 @@ document.getElementById('voiceBtn').onclick = function() {
     }
 };
 
-// RESPONSIVEVOICE
 window.addEventListener('load', function() {
     setTimeout(() => {
         if (typeof responsiveVoice !== 'undefined') {
@@ -540,17 +836,16 @@ window.addEventListener('load', function() {
 });
 
 function speakJarvis(text) {
-    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
+    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').replace(/\[YOUTUBE:[^\]]+\]/g, '').trim();
     if (typeof responsiveVoice !== 'undefined' && voiceReady) {
         responsiveVoice.speak(cleanText, "French Male", {pitch: 1, rate: 0.95, volume: 1});
     }
 }
 
 function testVoice() {
-    speakJarvis("Bonjour, je suis JARVIS. Tous les systèmes sont opérationnels.");
+    speakJarvis("Bonjour, je suis JARVIS. Tous les systèmes sont opérationnels, y compris l'intégration YouTube.");
 }
 
-// CONTROLE NAVIGATEUR
 function executeBrowserCommand(command) {
     if (!command) return;
     if (command.action === 'OPEN') {
@@ -572,20 +867,41 @@ function closeBrowserNotification() {
     document.getElementById('browserNotification').style.display = 'none';
 }
 
-// ===============================
-// ANIMATION TYPING + VOIX SYNCHRO
-// ===============================
+function displayYoutubeResults(results, chatWindow) {
+    if (!results || results.length === 0) return;
+    
+    const ytDiv = document.createElement('div');
+    ytDiv.className = 'youtube-results';
+    
+    let html = '<div class="youtube-results-header">🎬 Résultats YouTube</div>';
+    
+    results.forEach((video, index) => {
+        html += `
+            <div class="youtube-video-card" onclick="window.open('${video.url}', '_blank')">
+                <img src="${video.thumbnail}" alt="Thumbnail" class="youtube-thumbnail">
+                <div class="youtube-video-info">
+                    <div class="youtube-video-title">${video.title}</div>
+                    <div class="youtube-channel">📺 ${video.channelTitle}</div>
+                    <button class="youtube-play-btn" onclick="event.stopPropagation(); window.open('${video.url}', '_blank')">
+                        ▶ Regarder
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    ytDiv.innerHTML = html;
+    chatWindow.appendChild(ytDiv);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
 function typeWriter(text, element) {
     let index = 0;
     element.classList.add('typing');
-
-    // Nettoyage texte pour la voix
-    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
-
-    // ACTIVE GIF
+    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').replace(/\[YOUTUBE:[^\]]+\]/g, '').trim();
+    
     activateJarvisGif();
-
-    // LANCE LA VOIX AU DÉBUT (OBLIGATOIRE POUR CHROME)
+    
     if (typeof responsiveVoice !== 'undefined' && voiceReady) {
         responsiveVoice.cancel();
         responsiveVoice.speak(cleanText, "French Male", {
@@ -593,12 +909,12 @@ function typeWriter(text, element) {
             rate: 0.95,
             volume: 1,
             onend: () => {
-                // Quand la voix finit, on attend la fin du typing
-                waitForTypingEnd();
+                voiceFinished = true;
+                checkEnd();
             }
         });
     }
-
+    
     function type() {
         if (index < text.length) {
             element.textContent += text.charAt(index);
@@ -612,15 +928,10 @@ function typeWriter(text, element) {
             checkEnd();
         }
     }
-
+    
     let typingFinished = false;
     let voiceFinished = false;
-
-    function waitForTypingEnd() {
-        voiceFinished = true;
-        checkEnd();
-    }
-
+    
     function checkEnd() {
         if (typingFinished && voiceFinished) {
             setTimeout(() => {
@@ -628,12 +939,10 @@ function typeWriter(text, element) {
             }, 300);
         }
     }
-
+    
     type();
 }
 
-
-// FORM SUBMIT
 document.getElementById('chatForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -658,7 +967,6 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     userMsgDiv.textContent = userMessage;
     chatWindow.appendChild(userMsgDiv);
 
-    // ATTIVA GIF durante "thinking"
     activateJarvisGif();
 
     const thinkingDiv = document.createElement('div');
@@ -697,10 +1005,13 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         jarvisMsgDiv.appendChild(typingSpan);
         chatWindow.appendChild(jarvisMsgDiv);
 
-        const displayMessage = data.message.replace(/\[BROWSER:[^\]]+\]/g, '').trim();
+        const displayMessage = data.message.replace(/\[BROWSER:[^\]]+\]/g, '').replace(/\[YOUTUBE:[^\]]+\]/g, '').trim();
         
-        // ANIMAZIONE TYPING (che gestisce il GIF)
         typeWriter(displayMessage, typingSpan);
+
+        if (data.youtubeResults && data.youtubeResults.length > 0) {
+            setTimeout(() => displayYoutubeResults(data.youtubeResults, chatWindow), 500);
+        }
 
         if (data.browserCommand) {
             setTimeout(() => executeBrowserCommand(data.browserCommand), 1000);
@@ -721,7 +1032,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
 document.getElementById('messageInput').focus();
 
-console.log('🚀 JARVIS AI avec GIF animé pendant réponse initialisé !');
+console.log('🚀 JARVIS AI avec YouTube API initialisé !');
 </script>
 </body>
 </html>
