@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// JARVIS AI - YOUTUBE + C4AI VISION MODEL FOR IMAGES
+// JARVIS AI - YOUTUBE + C4AI VISION 32B FIXED
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -23,14 +23,14 @@ $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent cré�
 - Tu es expert dans TOUS les domaines de connaissance: sciences, technologie, histoire, culture, art, médecine, droit, etc.
 - Tu as accès à Google Search pour trouver des informations actuelles et récentes jusqu'en 2025
 - Tu as accès à YouTube API pour rechercher et ouvrir des vidéos
-- Tu utilises le modèle C4AI Aya Vision 8B pour analyser les images avec une précision exceptionnelle
+- Tu utilises le modèle C4AI Aya Vision 32B pour analyser les images avec une précision exceptionnelle
 - Tu peux faire des recherches inversées d'images pour identifier des objets, lieux, personnes
 - Tu peux faire des recherches web en temps réel pour répondre aux questions sur l'actualité
 - Tu peux contrôler le navigateur pour ouvrir des pages web de manière NATURELLE
 - Tu fournis des réponses précises, détaillées et utiles avec des sources vérifiables
 
 **ANALYSE D'IMAGES AVEC C4AI AYA VISION:**
-Quand l'utilisateur télécharge une image, tu utilises automatiquement le modèle C4AI Aya Vision 8B pour:
+Quand l'utilisateur télécharge une image, tu utilises automatiquement le modèle C4AI Aya Vision 32B pour:
 1. Analyser le contenu visuel de l'image avec une grande précision
 2. Identifier les objets, personnes, lieux, textes présents
 3. Comprendre le contexte et la scène
@@ -92,7 +92,7 @@ Tu comprends naturellement quand l'utilisateur veut que tu ouvres un site web ou
 - Stack Overflow: https://stackoverflow.com
 
 **INSTRUCTIONS IMPORTANTES:**
-1. Quand l'utilisateur télécharge une image, utilise AUTOMATIQUEMENT le modèle C4AI Aya Vision 8B
+1. Quand l'utilisateur télécharge une image, utilise AUTOMATIQUEMENT le modèle C4AI Aya Vision 32B
 2. Fournis une analyse détaillée et naturelle de l'image
 3. Quand l'utilisateur mentionne YouTube avec des mots comme \"cherche\", \"trouve\", \"montre\", \"vidéo\", \"search\", \"cerca\", \"busca\", utilise [YOUTUBE:SEARCH:query]
 4. Quand l'utilisateur veut juste ouvrir YouTube sans recherche, utilise [BROWSER:OPEN:https://www.youtube.com]
@@ -130,16 +130,35 @@ function wantsDate($message) {
     return false;
 }
 
+function getImageMimeType($imageBase64) {
+    // Estrai il tipo MIME dal prefisso data:image
+    if (preg_match('/^data:image\/(\w+);base64,/', $imageBase64, $matches)) {
+        $extension = $matches[1];
+        $mimeTypes = [
+            'jpeg' => 'image/jpeg',
+            'jpg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp'
+        ];
+        return $mimeTypes[$extension] ?? 'image/jpeg';
+    }
+    return 'image/jpeg';
+}
+
 function analyzeImageWithC4AIVision($imageBase64, $userMessage = "") {
     $url = "https://api.cohere.com/v2/chat";
     
-    // Rimuovi il prefisso data:image/...;base64, se presente
+    // Ottieni il tipo MIME corretto
+    $mimeType = getImageMimeType($imageBase64);
+    
+    // Rimuovi il prefisso data:image/...;base64,
     $cleanBase64 = preg_replace('/^data:image\/\w+;base64,/', '', $imageBase64);
     
-    $prompt = $userMessage ?: "Analyse cette image en détail. Décris ce que tu vois, les objets, personnes, lieux, textes, couleurs, et tout élément important. Sois précis et détaillé.";
+    $prompt = $userMessage ?: "Décris cette image en détail. Dis-moi ce que tu vois, les objets, les personnes, les couleurs, le contexte, et tous les éléments importants. Sois précis et naturel.";
     
     $requestBody = [
-        "model" => "c4ai-aya-vision-8b",
+        "model" => "c4ai-aya-vision-32b",
         "messages" => [
             [
                 "role" => "user",
@@ -148,7 +167,7 @@ function analyzeImageWithC4AIVision($imageBase64, $userMessage = "") {
                         "type" => "image",
                         "source" => [
                             "type" => "base64",
-                            "media_type" => "image/jpeg",
+                            "media_type" => $mimeType,
                             "data" => $cleanBase64
                         ]
                     ],
@@ -158,7 +177,9 @@ function analyzeImageWithC4AIVision($imageBase64, $userMessage = "") {
                     ]
                 ]
             ]
-        ]
+        ],
+        "temperature" => 0.3,
+        "max_tokens" => 1000
     ];
     
     $ch = curl_init($url);
@@ -176,31 +197,51 @@ function analyzeImageWithC4AIVision($imageBase64, $userMessage = "") {
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
     curl_close($ch);
+    
+    // Log per debug
+    error_log("Vision API Response Code: " . $httpCode);
+    error_log("Vision API Response: " . $response);
     
     if ($httpCode === 200) {
         $data = json_decode($response, true);
         
-        if (isset($data["message"]["content"][0]["text"])) {
-            return [
-                'success' => true,
-                'description' => $data["message"]["content"][0]["text"],
-                'model' => 'C4AI Aya Vision 8B'
-            ];
-        } elseif (isset($data["text"])) {
+        // Gestisci diversi formati di risposta
+        if (isset($data["message"]["content"])) {
+            foreach ($data["message"]["content"] as $content) {
+                if ($content["type"] === "text" && isset($content["text"])) {
+                    return [
+                        'success' => true,
+                        'description' => $content["text"],
+                        'model' => 'C4AI Aya Vision 32B'
+                    ];
+                }
+            }
+        }
+        
+        if (isset($data["text"])) {
             return [
                 'success' => true,
                 'description' => $data["text"],
-                'model' => 'C4AI Aya Vision 8B'
+                'model' => 'C4AI Aya Vision 32B'
             ];
         }
+        
+        // Se non c'è testo nella risposta
+        return [
+            'success' => false,
+            'error' => 'Risposta API senza testo',
+            'debug' => json_encode($data)
+        ];
     }
     
     return [
         'success' => false,
-        'error' => 'Erreur lors de l\'analyse de l\'image avec C4AI Vision',
+        'error' => 'Erreur Vision API: HTTP ' . $httpCode,
         'httpCode' => $httpCode,
-        'response' => $response
+        'response' => $response,
+        'curlError' => $error
     ];
 }
 
@@ -311,19 +352,28 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             
             if ($imageAnalysis['success']) {
                 $response["imageAnalysis"] = $imageAnalysis;
-                $response["modelUsed"] = "c4ai-vision"; // Modello automaticamente cambiato
+                $response["modelUsed"] = "c4ai-vision";
                 
                 // Se l'utente non ha scritto nulla, usa solo la descrizione dell'immagine
                 if (empty($userMessage)) {
-                    $response["message"] = "🖼️ **Analyse de l'image avec C4AI Aya Vision 8B:**\n\n" . $imageAnalysis['description'];
+                    $response["message"] = "🖼️ **Analyse de l'image avec C4AI Aya Vision 32B:**\n\n" . $imageAnalysis['description'];
                     $response["success"] = true;
                     echo json_encode($response, JSON_UNESCAPED_UNICODE);
                     exit;
                 } else {
                     // L'utente ha scritto qualcosa, combina con l'analisi
-                    $imageContext = "\n\n**ANALYSE D'IMAGE C4AI AYA VISION:**\n" . $imageAnalysis['description'] . "\n\n";
+                    $imageContext = "\n\n**ANALYSE D'IMAGE C4AI AYA VISION 32B:**\n" . $imageAnalysis['description'] . "\n\n";
                     $userMessage = $imageContext . "**Question de l'utilisateur:** " . $userMessage;
                 }
+            } else {
+                // Errore nell'analisi - mostra dettagli per debug
+                $response["success"] = false;
+                $response["message"] = "❌ Erreur lors de l'analyse de l'image.\n\n**Détails:** " . ($imageAnalysis['error'] ?? 'Erreur inconnue');
+                if (isset($imageAnalysis['debug'])) {
+                    $response["debug"] = $imageAnalysis['debug'];
+                }
+                echo json_encode($response, JSON_UNESCAPED_UNICODE);
+                exit;
             }
         }
         
@@ -440,7 +490,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS AI — C4AI Vision + YouTube</title>
+<title>JARVIS AI — C4AI Vision 32B + YouTube</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -901,14 +951,14 @@ body {
     <div class="row g-3">
         <div class="col-12 col-lg-8">
             <div class="panel">
-                <div class="panel-header">💬 JARVIS AI + 🎨 C4AI VISION + 🎬 YOUTUBE</div>
+                <div class="panel-header">💬 JARVIS AI + 🎨 C4AI VISION 32B + 🎬 YOUTUBE</div>
                 
                 <!-- Upload Immagine -->
                 <div class="image-upload-area" id="uploadArea">
                     <input type="file" id="imageInput" accept="image/*" style="display: none;">
                     <div id="uploadText">
                         🎨 <strong>Clicca o trascina un'immagine qui</strong><br>
-                        <span style="font-size: 0.9rem; color: rgba(255,255,255,0.6);">JARVIS utilizzerà <strong style="color: var(--vision-purple);">C4AI Aya Vision 8B</strong> per analizzarla</span>
+                        <span style="font-size: 0.9rem; color: rgba(255,255,255,0.6);">JARVIS utilizzerà <strong style="color: var(--vision-purple);">C4AI Aya Vision 32B</strong> per analizzarla</span>
                     </div>
                     <img id="imagePreview" alt="Preview">
                     <button class="remove-image-btn" id="removeImageBtn">✕ Rimuovi</button>
@@ -918,8 +968,8 @@ body {
                     <div class="msg-jarvis">
                         👋 Bonjour, je suis JARVIS. Vous pouvez me parler naturellement dans n'importe quelle langue !<br><br>
                         🎬 <strong>YouTube:</strong> Je peux chercher des vidéos pour vous<br>
-                        🎨 <strong>NOUVEAU - C4AI Aya Vision 8B:</strong> Téléchargez une image et je l'analyserai avec le modèle de vision avancé !<br><br>
-                        <span class="vision-badge">C4AI VISION 8B</span> se sélectionne automatiquement quand vous uploadez une image !
+                        🎨 <strong>NOUVEAU - C4AI Aya Vision 32B:</strong> Téléchargez une image et je l'analyserai avec le modèle de vision avancé !<br><br>
+                        <span class="vision-badge">C4AI VISION 32B</span> se sélectionne automatiquement quand vous uploadez une image !
                     </div>
                 </div>
                 <form id="chatForm">
@@ -991,7 +1041,7 @@ body {
                     • Upload un'immagine<br>
                     • "Qu'est-ce dans cette image ?"<br>
                     <br>
-                    <strong style="color: var(--vision-purple);">🎨 C4AI Vision:</strong><br>
+                    <strong style="color: var(--vision-purple);">🎨 C4AI Vision 32B:</strong><br>
                     Modèle automatique pour analyse d'images détaillée et naturelle !
                 </div>
             </div>
@@ -1134,14 +1184,14 @@ window.addEventListener('load', function() {
 });
 
 function speakJarvis(text) {
-    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').replace(/\[YOUTUBE:[^\]]+\]/g, '').trim();
+    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').replace(/\[YOUTUBE:[^\]]+\]/g, '').replace(/\*\*/g, '').trim();
     if (typeof responsiveVoice !== 'undefined' && voiceReady) {
         responsiveVoice.speak(cleanText, "French Male", {pitch: 1, rate: 0.95, volume: 1});
     }
 }
 
 function testVoice() {
-    speakJarvis("Bonjour, je suis JARVIS. C4AI Vision et YouTube sont opérationnels.");
+    speakJarvis("Bonjour, je suis JARVIS. C4AI Vision 32B et YouTube sont opérationnels.");
 }
 
 function executeBrowserCommand(command) {
@@ -1174,7 +1224,7 @@ function displayImageAnalysis(analysis, chatWindow) {
     let html = `
         <div class="image-analysis-header">
             🎨 Analyse d'image 
-            <span class="vision-badge">C4AI AYA VISION 8B</span>
+            <span class="vision-badge">C4AI VISION 32B</span>
         </div>
         <div class="analysis-content">
             ${analysis.description}
@@ -1217,7 +1267,7 @@ function displayYoutubeResults(results, chatWindow) {
 function typeWriter(text, element) {
     let index = 0;
     element.classList.add('typing');
-    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').replace(/\[YOUTUBE:[^\]]+\]/g, '').trim();
+    const cleanText = text.replace(/\[BROWSER:[^\]]+\]/g, '').replace(/\[YOUTUBE:[^\]]+\]/g, '').replace(/\*\*/g, '').trim();
     
     activateJarvisGif();
     
@@ -1300,7 +1350,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'msg-jarvis';
     thinkingDiv.innerHTML = uploadedImageData ? 
-        '🎨 JARVIS analyse l\'image avec <strong style="color: var(--vision-purple);">C4AI Vision 8B</strong> <span class="dots"><span>.</span><span>.</span><span>.</span></span>' :
+        '🎨 JARVIS analyse l\'image avec <strong style="color: var(--vision-purple);">C4AI Vision 32B</strong> <span class="dots"><span>.</span><span>.</span><span>.</span></span>' :
         '🤔 JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
     chatWindow.appendChild(thinkingDiv);
 
@@ -1309,7 +1359,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     const modelNames = {
         'c4ai': 'C4AI Aya Expanse 32B',
         'cosmosrp': 'CosmosRP',
-        'c4ai-vision': 'C4AI Aya Vision 8B'
+        'c4ai-vision': 'C4AI Aya Vision 32B'
     };
 
     messageInput.value = '';
@@ -1372,6 +1422,11 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
             setTimeout(() => executeBrowserCommand(data.browserCommand), 1000);
         }
 
+        // Debug info
+        if (data.debug) {
+            console.log('Debug info:', data.debug);
+        }
+
         chatWindow.scrollTop = chatWindow.scrollHeight;
         
         // Reset image
@@ -1397,7 +1452,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
 document.getElementById('messageInput').focus();
 
-console.log('🚀 JARVIS AI avec C4AI Vision 8B + YouTube initialisé !');
+console.log('🚀 JARVIS AI avec C4AI Vision 32B + YouTube initialisé !');
 </script>
 </body>
 </html>
