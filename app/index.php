@@ -148,40 +148,25 @@ function getImageMimeType($imageBase64) {
 
 function analyzeImageWithC4AIVision($imageBase64, $userMessage = "") {
     $url = "https://api.cohere.com/v2/chat";
-    
-    // Ottieni il tipo MIME corretto
+
     $mimeType = getImageMimeType($imageBase64);
-    
-    // Rimuovi il prefisso data:image/...;base64,
     $cleanBase64 = preg_replace('/^data:image\/\w+;base64,/', '', $imageBase64);
-    
-    $prompt = $userMessage ?: "Décris cette image en détail. Dis-moi ce que tu vois, les objets, les personnes, les couleurs, le contexte, et tous les éléments importants. Sois précis et naturel.";
-    
+
+    $prompt = $userMessage ?: 
+        "Décris cette image en détail. Objets, personnes, couleurs, contexte.";
+
     $requestBody = [
         "model" => "c4ai-aya-vision-32b",
-        "messages" => [
-            [
-                "role" => "user",
-                "content" => [
-                    [
-                        "type" => "image",
-                        "source" => [
-                            "type" => "base64",
-                            "media_type" => $mimeType,
-                            "data" => $cleanBase64
-                        ]
-                    ],
-                    [
-                        "type" => "text",
-                        "text" => $prompt
-                    ]
-                ]
-            ]
+        "input_text" => $prompt,
+        "input_image" => [
+            "type" => "base64",
+            "media_type" => $mimeType,
+            "data" => $cleanBase64
         ],
         "temperature" => 0.3,
         "max_tokens" => 1000
     ];
-    
+
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
@@ -191,57 +176,29 @@ function analyzeImageWithC4AIVision($imageBase64, $userMessage = "") {
         ],
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POSTFIELDS => json_encode($requestBody),
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_SSL_VERIFYPEER => false
+        CURLOPT_TIMEOUT => 30
     ]);
-    
+
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
     curl_close($ch);
-    
-    // Log per debug
-    error_log("Vision API Response Code: " . $httpCode);
-    error_log("Vision API Response: " . $response);
-    
+
     if ($httpCode === 200) {
         $data = json_decode($response, true);
-        
-        // Gestisci diversi formati di risposta
-        if (isset($data["message"]["content"])) {
-            foreach ($data["message"]["content"] as $content) {
-                if ($content["type"] === "text" && isset($content["text"])) {
-                    return [
-                        'success' => true,
-                        'description' => $content["text"],
-                        'model' => 'C4AI Aya Vision 32B'
-                    ];
-                }
-            }
-        }
-        
+
         if (isset($data["text"])) {
             return [
-                'success' => true,
-                'description' => $data["text"],
-                'model' => 'C4AI Aya Vision 32B'
+                "success" => true,
+                "description" => $data["text"],
+                "model" => "C4AI Aya Vision 32B"
             ];
         }
-        
-        // Se non c'è testo nella risposta
-        return [
-            'success' => false,
-            'error' => 'Risposta API senza testo',
-            'debug' => json_encode($data)
-        ];
     }
-    
+
     return [
-        'success' => false,
-        'error' => 'Erreur Vision API: HTTP ' . $httpCode,
-        'httpCode' => $httpCode,
-        'response' => $response,
-        'curlError' => $error
+        "success" => false,
+        "error" => "Erreur Vision API: HTTP $httpCode",
+        "response" => $response
     ];
 }
 
