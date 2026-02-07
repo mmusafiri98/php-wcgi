@@ -10,7 +10,7 @@ define('GOOGLE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
 define('SEARCH_ENGINE_ID', '511c9c9b776d246e4');
 
 /* ===================== YOUTUBE API ===================== */
-define('YOUTUBE_API_KEY', 'INSERISCI_LA_TUA_API_KEY');
+define('YOUTUBE_API_KEY', 'AIzaSyDVMToR77KZRXfY2Y-Wx2XIWGy58E_MZDA');
 
 $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent créé par Pepe Musafiri ... (PROMPT IDENTIQUE NON MODIFIÉ)";
 
