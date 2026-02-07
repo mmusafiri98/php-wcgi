@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// JARVIS AI - GIF ANIMATO + YOUTUBE API INTEGRATION
+// JARVIS AI - YOUTUBE + REVERSE IMAGE SEARCH
 // =====================================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -8,7 +8,8 @@ error_reporting(E_ALL);
 
 define('GOOGLE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
 define('SEARCH_ENGINE_ID', '511c9c9b776d246e4');
-define('YOUTUBE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c'); // Stessa chiave Google
+define('YOUTUBE_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
+define('VISION_API_KEY', 'AIzaSyAjglTZsz2VP972q6i8MgH5_euEQyZ6X3c');
 
 $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent créé par Pepe Musafiri, un ingénieur en informatique passionné qui s'est inspiré du JARVIS de Tony Stark dans Iron Man.
 
@@ -22,9 +23,24 @@ $JARVIS_SYSTEM_PROMPT = "Tu es JARVIS AI, un assistant virtuel intelligent cré�
 - Tu es expert dans TOUS les domaines de connaissance: sciences, technologie, histoire, culture, art, médecine, droit, etc.
 - Tu as accès à Google Search pour trouver des informations actuelles et récentes jusqu'en 2025
 - Tu as accès à YouTube API pour rechercher et ouvrir des vidéos
+- Tu as accès à Google Vision API pour analyser et rechercher des images
+- Tu peux faire des recherches inversées d'images pour identifier des objets, lieux, personnes
 - Tu peux faire des recherches web en temps réel pour répondre aux questions sur l'actualité
 - Tu peux contrôler le navigateur pour ouvrir des pages web de manière NATURELLE
 - Tu fournis des réponses précises, détaillées et utiles avec des sources vérifiables
+
+**ANALYSE D'IMAGES:**
+Quand l'utilisateur télécharge une image, tu peux:
+1. Analyser le contenu de l'image (objets, textes, lieux, logos)
+2. Faire une recherche inversée pour trouver des images similaires
+3. Identifier des produits, monuments, célébrités
+4. Chercher des vidéos YouTube liées à l'image
+
+**Exemples d'analyse d'images:**
+- L'utilisateur upload une image → Tu analyses et décris l'image automatiquement
+- \"Cherche cette image sur internet\" → [IMAGE:REVERSE_SEARCH]
+- \"Trouve des vidéos YouTube sur cette image\" → [IMAGE:YOUTUBE_SEARCH]
+- \"C'est quoi cette image?\" → Tu utilises Vision API pour identifier
 
 **CONTROLE NAVIGATEUR ET YOUTUBE:**
 Tu comprends naturellement quand l'utilisateur veut que tu ouvres un site web ou cherches sur YouTube, dans N'IMPORTE QUELLE langue:
@@ -75,13 +91,14 @@ Tu comprends naturellement quand l'utilisateur veut que tu ouvres un site web ou
 - Stack Overflow: https://stackoverflow.com
 
 **INSTRUCTIONS IMPORTANTES:**
-1. Quand l'utilisateur mentionne YouTube avec des mots comme \"cherche\", \"trouve\", \"montre\", \"vidéo\", \"search\", \"cerca\", \"busca\", utilise [YOUTUBE:SEARCH:query]
-2. Quand l'utilisateur veut juste ouvrir YouTube sans recherche, utilise [BROWSER:OPEN:https://www.youtube.com]
-3. Pour les sites normaux avec \"ouvre\", \"va sur\", \"open\", \"apri\", utilise [BROWSER:OPEN:URL]
-4. Pour chercher sur Google, utilise [BROWSER:SEARCH:query]
-5. Sois naturel dans ta compréhension - tu n'as PAS besoin de commandes exactes
-6. Réponds dans la langue de l'utilisateur
-7. Confirme l'action avant d'exécuter la commande
+1. Quand l'utilisateur télécharge une image, analyse-la AUTOMATIQUEMENT avec Vision API
+2. Quand l'utilisateur mentionne YouTube avec des mots comme \"cherche\", \"trouve\", \"montre\", \"vidéo\", \"search\", \"cerca\", \"busca\", utilise [YOUTUBE:SEARCH:query]
+3. Quand l'utilisateur veut juste ouvrir YouTube sans recherche, utilise [BROWSER:OPEN:https://www.youtube.com]
+4. Pour les sites normaux avec \"ouvre\", \"va sur\", \"open\", \"apri\", utilise [BROWSER:OPEN:URL]
+5. Pour chercher sur Google, utilise [BROWSER:SEARCH:query]
+6. Sois naturel dans ta compréhension - tu n'as PAS besoin de commandes exactes
+7. Réponds dans la langue de l'utilisateur
+8. Confirme l'action avant d'exécuter la commande
 
 **TON STYLE:**
 - Réponds de manière claire et structurée
@@ -109,6 +126,122 @@ function wantsDate($message) {
         if (strpos($msg, $kw) !== false) return true;
     }
     return false;
+}
+
+function analyzeImageWithVision($imageBase64) {
+    $url = "https://vision.googleapis.com/v1/images:annotate?key=" . VISION_API_KEY;
+    
+    $requestBody = [
+        'requests' => [
+            [
+                'image' => [
+                    'content' => $imageBase64
+                ],
+                'features' => [
+                    ['type' => 'LABEL_DETECTION', 'maxResults' => 10],
+                    ['type' => 'WEB_DETECTION', 'maxResults' => 10],
+                    ['type' => 'TEXT_DETECTION'],
+                    ['type' => 'LANDMARK_DETECTION'],
+                    ['type' => 'LOGO_DETECTION'],
+                    ['type' => 'OBJECT_LOCALIZATION']
+                ]
+            ]
+        ]
+    ];
+    
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POSTFIELDS => json_encode($requestBody),
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_SSL_VERIFYPEER => false
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        $data = json_decode($response, true);
+        if (isset($data['responses'][0])) {
+            $result = $data['responses'][0];
+            
+            $analysis = [
+                'success' => true,
+                'labels' => [],
+                'text' => '',
+                'landmarks' => [],
+                'logos' => [],
+                'webEntities' => [],
+                'similarImages' => [],
+                'bestGuess' => ''
+            ];
+            
+            // Labels (oggetti riconosciuti)
+            if (isset($result['labelAnnotations'])) {
+                foreach ($result['labelAnnotations'] as $label) {
+                    $analysis['labels'][] = [
+                        'description' => $label['description'],
+                        'score' => round($label['score'] * 100, 1)
+                    ];
+                }
+            }
+            
+            // Testo nell'immagine
+            if (isset($result['textAnnotations'][0])) {
+                $analysis['text'] = $result['textAnnotations'][0]['description'];
+            }
+            
+            // Monumenti/luoghi
+            if (isset($result['landmarkAnnotations'])) {
+                foreach ($result['landmarkAnnotations'] as $landmark) {
+                    $analysis['landmarks'][] = $landmark['description'];
+                }
+            }
+            
+            // Loghi
+            if (isset($result['logoAnnotations'])) {
+                foreach ($result['logoAnnotations'] as $logo) {
+                    $analysis['logos'][] = $logo['description'];
+                }
+            }
+            
+            // Web detection (ricerca inversa)
+            if (isset($result['webDetection'])) {
+                $webDetection = $result['webDetection'];
+                
+                // Best guess
+                if (isset($webDetection['bestGuessLabels'][0])) {
+                    $analysis['bestGuess'] = $webDetection['bestGuessLabels'][0]['label'];
+                }
+                
+                // Web entities
+                if (isset($webDetection['webEntities'])) {
+                    foreach ($webDetection['webEntities'] as $entity) {
+                        if (isset($entity['description'])) {
+                            $analysis['webEntities'][] = [
+                                'description' => $entity['description'],
+                                'score' => round(($entity['score'] ?? 0) * 100, 1)
+                            ];
+                        }
+                    }
+                }
+                
+                // Immagini simili
+                if (isset($webDetection['visuallySimilarImages'])) {
+                    foreach (array_slice($webDetection['visuallySimilarImages'], 0, 5) as $similar) {
+                        $analysis['similarImages'][] = $similar['url'];
+                    }
+                }
+            }
+            
+            return $analysis;
+        }
+    }
+    
+    return ['success' => false, 'error' => 'Erreur Vision API', 'httpCode' => $httpCode];
 }
 
 function youtubeSearch($query, $maxResults = 5) {
@@ -196,14 +329,78 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     header('Content-Type: application/json; charset=utf-8');
     $model = $_POST['model'] ?? "c4ai";
     $userMessage = trim($_POST['message'] ?? "");
-    $response = ["success" => false, "message" => "", "debug" => "", "searchUsed" => false, "browserCommand" => null, "youtubeResults" => null];
+    $uploadedImage = $_POST['image'] ?? null;
+    
+    $response = [
+        "success" => false, 
+        "message" => "", 
+        "debug" => "", 
+        "searchUsed" => false, 
+        "browserCommand" => null, 
+        "youtubeResults" => null,
+        "imageAnalysis" => null
+    ];
 
-    if ($userMessage !== "") {
+    if ($userMessage !== "" || $uploadedImage) {
         date_default_timezone_set('Europe/Brussels');
+        
+        // Analisi immagine se caricata
+        if ($uploadedImage) {
+            // Rimuovi il prefisso data:image/...;base64,
+            $imageBase64 = preg_replace('/^data:image\/\w+;base64,/', '', $uploadedImage);
+            
+            $imageAnalysis = analyzeImageWithVision($imageBase64);
+            
+            if ($imageAnalysis['success']) {
+                $response["imageAnalysis"] = $imageAnalysis;
+                
+                // Crea un contesto per l'AI basato sull'analisi
+                $imageContext = "\n\n**ANALYSE D'IMAGE DÉTECTÉE:**\n";
+                
+                if (!empty($imageAnalysis['bestGuess'])) {
+                    $imageContext .= "🔍 **Identification principale:** " . $imageAnalysis['bestGuess'] . "\n";
+                }
+                
+                if (!empty($imageAnalysis['labels'])) {
+                    $imageContext .= "\n📋 **Objets détectés:**\n";
+                    foreach (array_slice($imageAnalysis['labels'], 0, 5) as $label) {
+                        $imageContext .= "- " . $label['description'] . " (" . $label['score'] . "%)\n";
+                    }
+                }
+                
+                if (!empty($imageAnalysis['landmarks'])) {
+                    $imageContext .= "\n🏛️ **Monuments/Lieux:** " . implode(', ', $imageAnalysis['landmarks']) . "\n";
+                }
+                
+                if (!empty($imageAnalysis['logos'])) {
+                    $imageContext .= "\n🏢 **Logos/Marques:** " . implode(', ', $imageAnalysis['logos']) . "\n";
+                }
+                
+                if (!empty($imageAnalysis['text'])) {
+                    $imageContext .= "\n📝 **Texte dans l'image:**\n" . substr($imageAnalysis['text'], 0, 200) . "\n";
+                }
+                
+                if (!empty($imageAnalysis['webEntities'])) {
+                    $imageContext .= "\n🌐 **Entités Web associées:**\n";
+                    foreach (array_slice($imageAnalysis['webEntities'], 0, 5) as $entity) {
+                        $imageContext .= "- " . $entity['description'] . "\n";
+                    }
+                }
+                
+                $imageContext .= "\n**INSTRUCTIONS:** Décris cette image en détail et fournis des informations pertinentes basées sur l'analyse.\n";
+                
+                // Se l'utente non ha scritto nulla, crea un messaggio automatico
+                if (empty($userMessage)) {
+                    $userMessage = "Analyse cette image et dis-moi ce que tu vois.";
+                }
+                
+                $userMessage .= $imageContext;
+            }
+        }
         
         if (wantsTime($userMessage)) {
             $heure = date("H:i:s");
-            echo json_encode(["success" => true, "message" => "⏰ Il est actuellement **$heure** (heure de Belgique).", "searchUsed" => false, "browserCommand" => null, "youtubeResults" => null], JSON_UNESCAPED_UNICODE);
+            echo json_encode(["success" => true, "message" => "⏰ Il est actuellement **$heure** (heure de Belgique).", "searchUsed" => false, "browserCommand" => null, "youtubeResults" => null, "imageAnalysis" => null], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -211,7 +408,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
             $date = date("d/m/Y");
             $jours = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
             $jour = $jours[date("w")];
-            echo json_encode(["success" => true, "message" => "📅 Nous sommes le **$jour $date**.", "searchUsed" => false, "browserCommand" => null, "youtubeResults" => null], JSON_UNESCAPED_UNICODE);
+            echo json_encode(["success" => true, "message" => "📅 Nous sommes le **$jour $date**.", "searchUsed" => false, "browserCommand" => null, "youtubeResults" => null, "imageAnalysis" => null], JSON_UNESCAPED_UNICODE);
             exit;
         }
         
@@ -253,7 +450,6 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 $response["message"] = $data["choices"][0]["message"]["content"];
                 $response["success"] = true;
                 
-                // Controlla comandi browser e YouTube
                 if (preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $matches)) {
                     $response["browserCommand"] = ["action" => $matches[1], "param" => $matches[2]];
                 }
@@ -292,7 +488,6 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 $response["success"] = true;
             }
             
-            // Controlla comandi browser e YouTube
             if (isset($response["message"])) {
                 if (preg_match('/\[BROWSER:(OPEN|SEARCH|CLOSE):([^\]]*)\]/', $response["message"], $matches)) {
                     $response["browserCommand"] = ["action" => $matches[1], "param" => $matches[2]];
@@ -316,7 +511,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS AI — YouTube Integration</title>
+<title>JARVIS AI — Image Recognition + YouTube</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -340,7 +535,6 @@ body {
     padding-top: 320px;
 }
 
-/* GIF JARVIS */
 .jarvis-visual {
     position: fixed;
     top: 0;
@@ -454,7 +648,54 @@ body {
     animation: slideInLeft 0.3s ease;
 }
 
-/* YouTube Results Card */
+.uploaded-image-preview {
+    max-width: 300px;
+    max-height: 200px;
+    border-radius: 10px;
+    margin-top: 10px;
+    border: 2px solid var(--accent);
+    box-shadow: 0 0 15px rgba(0, 234, 255, 0.3);
+}
+
+.image-analysis-card {
+    background: rgba(0, 234, 255, 0.1);
+    border: 2px solid rgba(0, 234, 255, 0.3);
+    border-radius: 15px;
+    padding: 15px;
+    margin: 15px 0;
+    animation: slideInLeft 0.5s ease;
+}
+
+.image-analysis-header {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.analysis-item {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 234, 255, 0.2);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.analysis-label {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 5px;
+}
+
+.analysis-value {
+    font-size: 0.95rem;
+    color: #fff;
+    font-weight: 600;
+}
+
 .youtube-results {
     background: rgba(255, 0, 0, 0.1);
     border: 2px solid rgba(255, 0, 0, 0.3);
@@ -541,6 +782,50 @@ body {
     background: #cc0000;
     transform: scale(1.05);
     box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+.image-upload-area {
+    background: rgba(0, 234, 255, 0.05);
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.image-upload-area:hover {
+    background: rgba(0, 234, 255, 0.1);
+    border-color: var(--accent);
+}
+
+.image-upload-area.dragover {
+    background: rgba(0, 234, 255, 0.2);
+    border-color: var(--accent);
+    transform: scale(1.02);
+}
+
+#imagePreview {
+    max-width: 100%;
+    max-height: 150px;
+    border-radius: 10px;
+    margin-top: 10px;
+    display: none;
+    border: 2px solid var(--accent);
+}
+
+.remove-image-btn {
+    background: var(--red-glow);
+    color: #fff;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    margin-top: 10px;
+    cursor: pointer;
+    font-family: "Orbitron", Arial;
+    display: none;
 }
 
 @keyframes slideInRight {
@@ -676,17 +961,30 @@ body {
     <div class="row g-3">
         <div class="col-12 col-lg-8">
             <div class="panel">
-                <div class="panel-header">💬 JARVIS AI CHAT + 🎬 YOUTUBE</div>
+                <div class="panel-header">💬 JARVIS AI + 🖼️ IMAGE RECOGNITION + 🎬 YOUTUBE</div>
+                
+                <!-- Upload Immagine -->
+                <div class="image-upload-area" id="uploadArea">
+                    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                    <div id="uploadText">
+                        📸 <strong>Clicca o trascina un'immagine qui</strong><br>
+                        <span style="font-size: 0.9rem; color: rgba(255,255,255,0.6);">JARVIS analizzerà l'immagine automaticamente</span>
+                    </div>
+                    <img id="imagePreview" alt="Preview">
+                    <button class="remove-image-btn" id="removeImageBtn">✕ Rimuovi</button>
+                </div>
+                
                 <div id="chatWindow">
                     <div class="msg-jarvis">
                         👋 Bonjour, je suis JARVIS. Vous pouvez me parler naturellement dans n'importe quelle langue !<br><br>
-                        🎬 <strong>Nouveau:</strong> Je peux maintenant chercher des vidéos sur YouTube pour vous !<br>
-                        Exemple: "Cherche des vidéos de cuisine sur YouTube"
+                        🎬 <strong>YouTube:</strong> Je peux chercher des vidéos pour vous<br>
+                        🖼️ <strong>NOUVEAU - Analyse d'images:</strong> Téléchargez une image et je l'analyserai avec Google Vision API !<br><br>
+                        Exemple: Uploadez une photo d'un monument et je vous dirai ce que c'est !
                     </div>
                 </div>
                 <form id="chatForm">
                     <div class="mb-3">
-                        <input type="text" id="messageInput" class="form-control" placeholder="Tapez votre message..." autocomplete="off" required>
+                        <input type="text" id="messageInput" class="form-control" placeholder="Tapez votre message (ou uploadez juste une image)..." autocomplete="off">
                     </div>
                     <div class="row g-2 align-items-center">
                         <div class="col-12 col-sm-7 col-md-5">
@@ -715,6 +1013,10 @@ body {
                 <div class="status-item">
                     <span class="status-label">GIF JARVIS</span>
                     <span class="status-value" id="gifStatus">⚫ Fermo</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Vision API</span>
+                    <span class="status-value">✅ Active</span>
                 </div>
                 <div class="status-item">
                     <span class="status-label">YouTube API</span>
@@ -746,12 +1048,11 @@ body {
                     <strong style="color: var(--accent);">💬 Commandes:</strong><br>
                     • "Ouvre YouTube"<br>
                     • "Cherche des vidéos de cuisine"<br>
-                    • "Find guitar tutorials" (EN)<br>
-                    • "Cerca video di gatti" (IT)<br>
-                    • "Quelle heure est-il ?"<br>
+                    • Upload un'immagine<br>
+                    • "Trova video su questa immagine"<br>
                     <br>
-                    <strong style="color: #ff0000;">🎬 YouTube:</strong><br>
-                    Recherche et affichage direct de vidéos avec miniatures et liens !
+                    <strong style="color: #00ff00;">🖼️ Vision API:</strong><br>
+                    Riconoscimento oggetti, testi, monumenti, loghi e ricerca inversa!
                 </div>
             </div>
         </div>
@@ -776,6 +1077,7 @@ let messageCount = 0;
 let voiceReady = false;
 let recognition = null;
 let isListening = false;
+let uploadedImageData = null;
 const jarvisGif = document.getElementById('jarvisGif');
 const gifStatus = document.getElementById('gifStatus');
 
@@ -791,6 +1093,61 @@ function deactivateJarvisGif() {
     gifStatus.style.color = '#8bffcf';
 }
 
+// IMAGE UPLOAD
+const uploadArea = document.getElementById('uploadArea');
+const imageInput = document.getElementById('imageInput');
+const imagePreview = document.getElementById('imagePreview');
+const removeImageBtn = document.getElementById('removeImageBtn');
+const uploadText = document.getElementById('uploadText');
+
+uploadArea.addEventListener('click', () => imageInput.click());
+
+imageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleImageFile(file);
+});
+
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+        handleImageFile(file);
+    }
+});
+
+function handleImageFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        uploadedImageData = e.target.result;
+        imagePreview.src = uploadedImageData;
+        imagePreview.style.display = 'block';
+        removeImageBtn.style.display = 'inline-block';
+        uploadText.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+
+removeImageBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    uploadedImageData = null;
+    imagePreview.src = '';
+    imagePreview.style.display = 'none';
+    removeImageBtn.style.display = 'none';
+    uploadText.style.display = 'block';
+    imageInput.value = '';
+});
+
+// VOICE RECOGNITION
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
@@ -826,6 +1183,7 @@ document.getElementById('voiceBtn').onclick = function() {
     }
 };
 
+// VOICE SYNTHESIS
 window.addEventListener('load', function() {
     setTimeout(() => {
         if (typeof responsiveVoice !== 'undefined') {
@@ -843,7 +1201,7 @@ function speakJarvis(text) {
 }
 
 function testVoice() {
-    speakJarvis("Bonjour, je suis JARVIS. Tous les systèmes sont opérationnels, y compris l'intégration YouTube.");
+    speakJarvis("Bonjour, je suis JARVIS. Vision API et YouTube sont opérationnels.");
 }
 
 function executeBrowserCommand(command) {
@@ -865,6 +1223,57 @@ function showBrowserNotification(message) {
 
 function closeBrowserNotification() {
     document.getElementById('browserNotification').style.display = 'none';
+}
+
+function displayImageAnalysis(analysis, chatWindow) {
+    if (!analysis || !analysis.success) return;
+    
+    const analysisDiv = document.createElement('div');
+    analysisDiv.className = 'image-analysis-card';
+    
+    let html = '<div class="image-analysis-header">🖼️ Analyse d\'image Google Vision</div>';
+    
+    if (analysis.bestGuess) {
+        html += `<div class="analysis-item">
+            <div class="analysis-label">🔍 Identification principale:</div>
+            <div class="analysis-value">${analysis.bestGuess}</div>
+        </div>`;
+    }
+    
+    if (analysis.labels && analysis.labels.length > 0) {
+        html += `<div class="analysis-item">
+            <div class="analysis-label">📋 Objets détectés:</div>
+            <div class="analysis-value">`;
+        analysis.labels.slice(0, 5).forEach(label => {
+            html += `${label.description} (${label.score}%), `;
+        });
+        html = html.slice(0, -2) + `</div></div>`;
+    }
+    
+    if (analysis.landmarks && analysis.landmarks.length > 0) {
+        html += `<div class="analysis-item">
+            <div class="analysis-label">🏛️ Monuments/Lieux:</div>
+            <div class="analysis-value">${analysis.landmarks.join(', ')}</div>
+        </div>`;
+    }
+    
+    if (analysis.logos && analysis.logos.length > 0) {
+        html += `<div class="analysis-item">
+            <div class="analysis-label">🏢 Logos/Marques:</div>
+            <div class="analysis-value">${analysis.logos.join(', ')}</div>
+        </div>`;
+    }
+    
+    if (analysis.text) {
+        html += `<div class="analysis-item">
+            <div class="analysis-label">📝 Texte détecté:</div>
+            <div class="analysis-value">${analysis.text.substring(0, 200)}...</div>
+        </div>`;
+    }
+    
+    analysisDiv.innerHTML = html;
+    chatWindow.appendChild(analysisDiv);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
 function displayYoutubeResults(results, chatWindow) {
@@ -954,7 +1363,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     const userMessage = messageInput.value.trim();
     const selectedModel = modelSelect.value;
 
-    if (!userMessage) return;
+    if (!userMessage && !uploadedImageData) return;
 
     sendBtn.disabled = true;
     sendBtn.textContent = '⏳ Envoi...';
@@ -964,14 +1373,25 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
     const userMsgDiv = document.createElement('div');
     userMsgDiv.className = 'msg-user';
-    userMsgDiv.textContent = userMessage;
+    userMsgDiv.textContent = userMessage || "📸 [Image uploadée]";
+    
+    if (uploadedImageData) {
+        const imgPreview = document.createElement('img');
+        imgPreview.src = uploadedImageData;
+        imgPreview.className = 'uploaded-image-preview';
+        userMsgDiv.appendChild(document.createElement('br'));
+        userMsgDiv.appendChild(imgPreview);
+    }
+    
     chatWindow.appendChild(userMsgDiv);
 
     activateJarvisGif();
 
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'msg-jarvis';
-    thinkingDiv.innerHTML = '🤔 JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+    thinkingDiv.innerHTML = uploadedImageData ? 
+        '🔍 JARVIS analyse l\'image <span class="dots"><span>.</span><span>.</span><span>.</span></span>' :
+        '🤔 JARVIS réfléchit <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
     chatWindow.appendChild(thinkingDiv);
 
     chatWindow.scrollTop = chatWindow.scrollHeight;
@@ -989,6 +1409,10 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         formData.append('message', userMessage);
         formData.append('model', selectedModel);
         formData.append('ajax', 'true');
+        
+        if (uploadedImageData) {
+            formData.append('image', uploadedImageData);
+        }
 
         const response = await fetch(window.location.href, {
             method: 'POST',
@@ -998,6 +1422,11 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         const data = await response.json();
 
         thinkingDiv.remove();
+        
+        // Mostra analisi immagine se presente
+        if (data.imageAnalysis) {
+            displayImageAnalysis(data.imageAnalysis, chatWindow);
+        }
 
         const jarvisMsgDiv = document.createElement('div');
         jarvisMsgDiv.className = 'msg-jarvis';
@@ -1018,6 +1447,16 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         }
 
         chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+        // Reset image
+        if (uploadedImageData) {
+            uploadedImageData = null;
+            imagePreview.src = '';
+            imagePreview.style.display = 'none';
+            removeImageBtn.style.display = 'none';
+            uploadText.style.display = 'block';
+            imageInput.value = '';
+        }
 
     } catch (error) {
         thinkingDiv.innerHTML = '❌ Erreur : ' + error.message;
@@ -1032,7 +1471,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
 document.getElementById('messageInput').focus();
 
-console.log('🚀 JARVIS AI avec YouTube API initialisé !');
+console.log('🚀 JARVIS AI avec Vision API + YouTube initialisé !');
 </script>
 </body>
 </html>
