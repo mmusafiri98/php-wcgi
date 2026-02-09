@@ -131,7 +131,6 @@ function wantsDate($message) {
 }
 
 function getImageMimeType($imageBase64) {
-    // Estrai il tipo MIME dal prefisso data:image
     if (preg_match('/^data:image\/(\w+);base64,/', $imageBase64, $matches)) {
         $extension = $matches[1];
         $mimeTypes = [
@@ -152,16 +151,29 @@ function analyzeImageWithC4AIVision($imageBase64, $userMessage = "") {
     $mimeType = getImageMimeType($imageBase64);
     $cleanBase64 = preg_replace('/^data:image\/\w+;base64,/', '', $imageBase64);
 
-    $prompt = $userMessage ?: 
-        "Décris cette image en détail. Objets, personnes, couleurs, contexte.";
+    $prompt = $userMessage ?: "Décris cette image en détail. Dis-moi ce que tu vois: objets, personnes, couleurs, textes, contexte et tous les éléments importants. Sois précis et naturel.";
 
+    // FORMATO CORRETTO per Cohere Vision API v2
     $requestBody = [
         "model" => "c4ai-aya-vision-32b",
-        "input_text" => $prompt,
-        "input_image" => [
-            "type" => "base64",
-            "media_type" => $mimeType,
-            "data" => $cleanBase64
+        "messages" => [
+            [
+                "role" => "user",
+                "content" => [
+                    [
+                        "type" => "image",
+                        "source" => [
+                            "type" => "base64",
+                            "media_type" => $mimeType,
+                            "data" => $cleanBase64
+                        ]
+                    ],
+                    [
+                        "type" => "text",
+                        "text" => $prompt
+                    ]
+                ]
+            ]
         ],
         "temperature" => 0.3,
         "max_tokens" => 1000
@@ -176,15 +188,32 @@ function analyzeImageWithC4AIVision($imageBase64, $userMessage = "") {
         ],
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POSTFIELDS => json_encode($requestBody),
-        CURLOPT_TIMEOUT => 30
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_SSL_VERIFYPEER => false
     ]);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
+    error_log("Vision API Response Code: " . $httpCode);
+    error_log("Vision API Response: " . $response);
+
     if ($httpCode === 200) {
         $data = json_decode($response, true);
+
+        // Gestione risposta Cohere v2
+        if (isset($data["message"]["content"])) {
+            foreach ($data["message"]["content"] as $content) {
+                if (isset($content["type"]) && $content["type"] === "text" && isset($content["text"])) {
+                    return [
+                        "success" => true,
+                        "description" => $content["text"],
+                        "model" => "C4AI Aya Vision 32B"
+                    ];
+                }
+            }
+        }
 
         if (isset($data["text"])) {
             return [
@@ -303,7 +332,6 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
     if ($userMessage !== "" || $uploadedImage) {
         date_default_timezone_set('Europe/Brussels');
         
-        // ANALISI IMMAGINE CON C4AI VISION SE PRESENTE
         if ($uploadedImage) {
             $imageAnalysis = analyzeImageWithC4AIVision($uploadedImage, $userMessage);
             
@@ -311,23 +339,20 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'true') {
                 $response["imageAnalysis"] = $imageAnalysis;
                 $response["modelUsed"] = "c4ai-vision";
                 
-                // Se l'utente non ha scritto nulla, usa solo la descrizione dell'immagine
                 if (empty($userMessage)) {
                     $response["message"] = "🖼️ **Analyse de l'image avec C4AI Aya Vision 32B:**\n\n" . $imageAnalysis['description'];
                     $response["success"] = true;
                     echo json_encode($response, JSON_UNESCAPED_UNICODE);
                     exit;
                 } else {
-                    // L'utente ha scritto qualcosa, combina con l'analisi
                     $imageContext = "\n\n**ANALYSE D'IMAGE C4AI AYA VISION 32B:**\n" . $imageAnalysis['description'] . "\n\n";
                     $userMessage = $imageContext . "**Question de l'utilisateur:** " . $userMessage;
                 }
             } else {
-                // Errore nell'analisi - mostra dettagli per debug
                 $response["success"] = false;
                 $response["message"] = "❌ Erreur lors de l'analyse de l'image.\n\n**Détails:** " . ($imageAnalysis['error'] ?? 'Erreur inconnue');
-                if (isset($imageAnalysis['debug'])) {
-                    $response["debug"] = $imageAnalysis['debug'];
+                if (isset($imageAnalysis['response'])) {
+                    $response["debug"] = $imageAnalysis['response'];
                 }
                 echo json_encode($response, JSON_UNESCAPED_UNICODE);
                 exit;
@@ -910,7 +935,6 @@ body {
             <div class="panel">
                 <div class="panel-header">💬 JARVIS AI + 🎨 C4AI VISION 32B + 🎬 YOUTUBE</div>
                 
-                <!-- Upload Immagine -->
                 <div class="image-upload-area" id="uploadArea">
                     <input type="file" id="imageInput" accept="image/*" style="display: none;">
                     <div id="uploadText">
@@ -1040,7 +1064,6 @@ function deactivateJarvisGif() {
     gifStatus.style.color = '#8bffcf';
 }
 
-// IMAGE UPLOAD
 const uploadArea = document.getElementById('uploadArea');
 const imageInput = document.getElementById('imageInput');
 const imagePreview = document.getElementById('imagePreview');
@@ -1094,7 +1117,6 @@ removeImageBtn.addEventListener('click', (e) => {
     imageInput.value = '';
 });
 
-// VOICE RECOGNITION
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
@@ -1130,7 +1152,6 @@ document.getElementById('voiceBtn').onclick = function() {
     }
 };
 
-// VOICE SYNTHESIS
 window.addEventListener('load', function() {
     setTimeout(() => {
         if (typeof responsiveVoice !== 'undefined') {
@@ -1340,7 +1361,6 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
         thinkingDiv.remove();
         
-        // Aggiorna il modello usato nel pannello
         if (data.modelUsed) {
             document.getElementById('currentModel').textContent = modelNames[data.modelUsed] || data.modelUsed;
             if (data.modelUsed === 'c4ai-vision') {
@@ -1350,12 +1370,10 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
             }
         }
         
-        // Mostra analisi immagine se presente
         if (data.imageAnalysis && data.imageAnalysis.success) {
             displayImageAnalysis(data.imageAnalysis, chatWindow);
         }
 
-        // Se c'è un messaggio aggiuntivo dall'AI
         if (data.message && data.message.trim()) {
             const jarvisMsgDiv = document.createElement('div');
             jarvisMsgDiv.className = 'msg-jarvis';
@@ -1367,7 +1385,6 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
             
             typeWriter(displayMessage, typingSpan);
         } else {
-            // Se non c'è messaggio, disattiva il GIF dopo l'analisi
             setTimeout(() => deactivateJarvisGif(), 500);
         }
 
@@ -1379,14 +1396,12 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
             setTimeout(() => executeBrowserCommand(data.browserCommand), 1000);
         }
 
-        // Debug info
         if (data.debug) {
             console.log('Debug info:', data.debug);
         }
 
         chatWindow.scrollTop = chatWindow.scrollHeight;
         
-        // Reset image
         if (uploadedImageData) {
             uploadedImageData = null;
             imagePreview.src = '';
